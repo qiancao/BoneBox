@@ -3,7 +3,7 @@ phantoms.tbbone
 
 An analytical trabecular bone phantom
 
-Authors: Qin Li, Xin Xu, Qian Cao
+Authors: Qin Li, Nada Kamona, Xin Xu, Qian Cao
 
 """
 
