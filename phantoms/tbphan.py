@@ -1,5 +1,5 @@
 """
-phantoms.tbphan
+phantoms.tbbone
 
 An analytical trabecular bone phantom
 
