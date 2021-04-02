@@ -11,6 +11,8 @@ Authors: Qin Li, Nada Kamona, Xin Xu, Qian Cao
 
 """
 
+import optimesh
+
 # Compute rectangular VOI volume from height and radius
 def vol(sliceHeight, radius0):
     return sliceHeight*(2*radius0)**2
@@ -18,3 +20,7 @@ def vol(sliceHeight, radius0):
 # Compute number of seed points from volume and trabecular spacing
 def Nseed(volume, spacing):
     return ((volume**(1/3))/spacing)**3
+
+def cvt_square_nonuniform (n, sample_num, f, nbofiter):
+    
+    return p

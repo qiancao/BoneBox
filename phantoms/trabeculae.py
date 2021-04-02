@@ -46,7 +46,7 @@ def makeVertebralBone(generator_num,
     # Number of layers in Z
     M =  np.round(sliceHeight/delta*z_xy_density_ratio)
     
-    # Number of seed points in each plane * 1.1
+    # Number of seed points in each plane * 1.1 (TODO: what is this 1.1 for?)
     KK = np.round(zoom_factor**KK_factor*generator_num/M*1.1/z_xy_density_ratio)
     
     
