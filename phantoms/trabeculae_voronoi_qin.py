@@ -1,13 +1,14 @@
 """
-phantoms.trabeculae
+phantoms.trabeculae_voronoi_qin
 
-An analytical trabecular bone phantom
+A voronoi-seeding-based trabecular bone phantom. Transcription of original implementation.
 
 Authors: Qin Li, Nada Kamona, Xin Xu, Qian Cao
 
 """
 
 import numpy as np
+from scipy.spatial import Voronoi
 from trabeculae_utils import vol, Nseed
 
 # Parameters for volume size
