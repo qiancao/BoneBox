@@ -13,6 +13,8 @@ import numpy as np
 # Delunary to test for colinearlity
 from scipy.spatial import Voronoi, Delaunay
 # import optimesh # May be a good idea for CVT post perturbation
+from itertools import chain # list unpacking
+
 import utils
 
 def makeSeedPointsCartesian(Sxyz, Nxyz):
@@ -161,7 +163,7 @@ def findUniqueEdgesAndFaces(vor, ind, maxEdgePerFace=8):
     # Filter data_list and keep only unique elements (which are also lists)
     def uniq(data_list):
         # https://stackoverflow.com/questions/3724551/python-uniqueness-for-list-of-lists
-       return [list(x) for x in set(tuple(x) for x in data_list)]
+       return [list(x) for x in set(frozenset(x) for x in data_list)]
         
     # Vertices which have been excluded (outside the extent of VOI)
     ind_exclude = set(np.arange(len(vor.vertices)))-set(np.array(ind))
@@ -176,21 +178,27 @@ def findUniqueEdgesAndFaces(vor, ind, maxEdgePerFace=8):
     # TODO: Condense vertices with coplanar vertices (most faces)
     # See https://www.mathworks.com/matlabcentral/fileexchange/24484-geom3d
     # varargout = mergeCoplanarFaces(nodes, varargin)
-    # This may not be necessary
     
     # Extract edges from faces
-    ridge_circ = [vor.ridge_vertices[x] + [vor.ridge_vertices[x][0]] 
+    ridge_circ = [vor.ridge_vertices[x] + [vor.ridge_vertices[x][0]]
                   for x in ridge_ind] # This is a copy of ridge
-    
+    edges = [roll2(x) for x in ridge_circ]
+    # https://stackoverflow.com/questions/45816549/flatten-a-nested-list-using-list-unpacking-in-a-list-comprehension
+    edges = list(chain.from_iterable(edges))
     
     # Apply uniqueness to faces and edges
     uniqueFaces = uniq(ridge)
-    uniqueEdges = []
+    uniqueEdges = uniq(edges)
     
     return uniqueEdges, uniqueFaces
+    
 
+def dropEdgesRandom(uniqueEdges):
+    pass
 
 if __name__ == "__main__":
+    
+    import matplotlib.pyplot as plt
     
     print('Running example for TrabeculaeVoronoi')
     Sxyz, Nxyz = (10,10,10), (5,5,5)
