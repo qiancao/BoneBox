@@ -70,3 +70,5 @@ def Polar2CartesianSphere(r, Theta, Phi):
     
     return np.array([x,y,z]).T
 
+def MinMaxNorm(x, xmin, xmax):
+    return (x-xmin)/(xmax-xmin)

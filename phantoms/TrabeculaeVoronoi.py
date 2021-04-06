@@ -63,6 +63,8 @@ def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=
         Cartesian seed points.
     Rxyz : scalar or (tuple or list) of floats
         Radius of maximum shifts in X, Y and Z.
+    Sxyz : tuple or list of floats
+        Size of VOI along each dimension (e.g. mm). Needed to filter out vertices out of extent.
 
     Returns
     -------
@@ -73,35 +75,67 @@ def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=
     # Number of points
     Np = points.shape[0]
     
-    # Generate a random array representing perturbation
+    # Generate a random array for perturbation from [0,1)
     if randState is not None:
         r = np.random.RandomState(randState)
-        rarr = r.random((Np,3))
+    rarr = r.random((Np,3))
         
-    # Sample perturbation from sphere ()
-    rarr[:,0] = rarr[:,0]*Rxyz
-    Pxyz = utils.Polar2CartesianSphere()
+    # Sample perturbation from sphere
+    R = rarr[:,0]*Rxyz
+    Theta = rarr[:,1]*2*np.pi
+    Phi = utils.MinMaxNorm(rarr[:,2], -np.pi/2, np.pi/2)
+    Pxyz = utils.Polar2CartesianSphere(R,Theta,Phi)
     
     # Perturb points in XY
+    ppoints = points + Pxyz
     
+    return ppoints
+
+def applyVoronoi(ppoints, Sxyz):
+    """
+    Apply Voronoi Tessellation to (perturbed) points, and compute index of 
+    vertices within the VOI.
+
+    Parameters
+    ----------
+    ppoints : np.ndarray [N,3]
+        List of perturbed points.
+    Sxyz : tuple
+        DESCRIPTION.
+
+    Returns
+    -------
+    vor : scipy.spatial.qhull.Voronoi
+        Voronoi tessellation object.
+    ind : np.ndarray integers
+        Index of vertices within VOI.
+
+    """
     
     # Voronoi Points in XY, retry on QHull error
     while True:
         try:
-            vor = Voronoi(points)
+            vor = Voronoi(ppoints)
         except:
             raise("QHull Error, retrying")
             continue
         break
     
-    return vor
+    # Extract index of Voronoi vertices within the VOI extent
+    Sxyz = np.array(Sxyz)
+    ind = np.nonzero(np.prod(np.abs(vor.vertices) < Sxyz/2, axis=1))[0]
+    
+    return vor, ind
 
 if __name__ == "__main__":
     # TODO move example driver script into here
     
     print('Running example for TrabeculaeVoronoi')
     Sxyz, Nxyz = (6,6,6), (3,3,3)
-    Rxy, Rz = 0.5, 0.5
+    Rxyz = 0.5
     
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
-    vor = perturbSeedPointsCartesianUniformXYZ(points, Rxy, Rz)
+    ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
+    vor, ind = applyVoronoi(ppoints, Sxyz)
+    
+    
