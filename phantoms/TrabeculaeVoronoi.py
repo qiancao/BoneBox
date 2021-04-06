@@ -8,7 +8,7 @@ Authors:  Qian Cao, Xin Xu, Nada Kamona, Qin Li
 """
 
 import numpy as np
-from scipy.spatial import Voronoi
+from scipy.spatial import Voronoi, Delunay
 import utils
 
 def makeSeedPointsCartesian(Sxyz, Nxyz):
@@ -126,6 +126,39 @@ def applyVoronoi(ppoints, Sxyz):
     ind = np.nonzero(np.prod(np.abs(vor.vertices) < Sxyz/2, axis=1))[0]
     
     return vor, ind
+
+def findUniqueEdges(vor, ind, maxEdgePerFace=8):
+    """
+    Compute unique edges for each Voronoi cell
+
+    Parameters
+    ----------
+    vor : scipy.spatial.qhull.Voronoi
+        Voronoi tessellation object.
+    ind : np.ndarray integers
+        Index of vertices within VOI.
+    maxEdgePerFace : integer
+        Maximum edges per face.
+
+    Returns
+    -------
+    uniqueEdges, uniqueFaces
+
+    """
+    
+    # Vertices which have been excluded (outside the extent of VOI)
+    ind_exclude = set(np.arange(len(vor.vertices)))-set(np.array(ind))
+    
+    # Exclude ridges (collection of vertices) containing excluded vertices
+    vertices = [vor.ridge_vertices[x] for x in len(vor.ridge_vertices) 
+                if vor.ridge_vertices[x]]
+    
+    # Exclude coplanar vertices, get unique facces and vertices
+    
+    
+    return uniqueEdges, uniqueFaces
+    
+
 
 if __name__ == "__main__":
     # TODO move example driver script into here
