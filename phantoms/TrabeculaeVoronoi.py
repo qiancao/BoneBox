@@ -107,7 +107,7 @@ def applyVoronoi(ppoints, Sxyz):
     ppoints : np.ndarray [N,3]
         List of perturbed points.
     Sxyz : tuple
-        DESCRIPTION.
+        Size of VOI along each dimension (e.g. mm). Needed to filter out vertices out of extent.
 
     Returns
     -------
@@ -191,10 +191,19 @@ def findUniqueEdgesAndFaces(vor, ind, maxEdgePerFace=8):
     uniqueEdges = uniq(edges)
     
     return uniqueEdges, uniqueFaces
-    
 
-def dropEdgesRandom(uniqueEdges):
-    pass
+def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8):
+    # Drop random edges
+    
+    Nedges = len(uniqueEdges)
+    
+    if isinstance(dropFraction, float):
+        Nretain = np.round(Nedges*dropFraction).astype(int)
+        retain_ind = np.random.choice(Nedges, Nretain, replace=False)
+        
+    uniqueEdgesRetain = [uniqueEdges[x] for x in retain_ind]
+        
+    return uniqueEdgesRetain
 
 if __name__ == "__main__":
     
@@ -203,10 +212,11 @@ if __name__ == "__main__":
     print('Running example for TrabeculaeVoronoi')
     Sxyz, Nxyz = (10,10,10), (5,5,5)
     Rxyz = 0.5
+    dropFraction = 0.8
     
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
     ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
     vor, ind = applyVoronoi(ppoints, Sxyz)
-    uniq_edges, uniq_faces = findUniqueEdgesAndFaces(vor, ind)
-    
+    uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
+    uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction)
     
