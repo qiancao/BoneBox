@@ -192,8 +192,38 @@ def findUniqueEdgesAndFaces(vor, ind, maxEdgePerFace=8):
     
     return uniqueEdges, uniqueFaces
 
-def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8):
-    # Drop random edges
+def computeEdgeCosine(vertices, edges, direction = (0,0,1)):
+    """
+    Compute direction cosine with of edges with points in vertices, along a
+    specified direction.
+
+    Parameters
+    ----------
+    vertices : np.ndarray (Nverts,3)
+        Coordinates of vertices.
+    edges : [[indStart, indEnd],...,[indStart, indEnd]] (Nedges,2) integers
+        Vertex indices of the starting and end points.
+    direction: tuple
+        Direction the cosine is computed against.
+
+    Returns
+    -------
+    cosines : np.ndarray (Nedges)
+        cosine with respect to direction.
+
+    """
+    edges, vertices, direction = np.array(edges), np.array(vertices), np.array(direction)
+    
+    edgeVertices = vertices[edges,:] # shape = (Nedges,2,3)
+    edgeVectors = edgeVertices[:,1,:] - edgeVertices[:,0,:] # (Nedges,3)
+
+    cosines = np.dot(edgeVectors,direction) \
+        / np.linalg.norm(edgeVectors,axis=1) / np.linalg.norm(direction)
+    
+    return cosines
+
+def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
+    # Drop random edges uniformly throughout the entire VOI
     
     Nedges = len(uniqueEdges)
     
@@ -204,6 +234,8 @@ def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8):
     uniqueEdgesRetain = [uniqueEdges[x] for x in retain_ind]
         
     return uniqueEdgesRetain
+
+
 
 if __name__ == "__main__":
     
@@ -218,5 +250,5 @@ if __name__ == "__main__":
     ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
     vor, ind = applyVoronoi(ppoints, Sxyz)
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
-    uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction)
+    uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction, randState=123)
     
