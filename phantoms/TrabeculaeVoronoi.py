@@ -192,10 +192,9 @@ def findUniqueEdgesAndFaces(vor, ind, maxEdgePerFace=8):
     
     return uniqueEdges, uniqueFaces
 
-def computeEdgeCosine(vertices, edges, direction = (0,0,1)):
+def getEdgeVertices(vertices, edges):
     """
-    Compute direction cosine with of edges with points in vertices, along a
-    specified direction.
+    Get vertices selected by ind, after converting to np.ndarray.
 
     Parameters
     ----------
@@ -203,6 +202,29 @@ def computeEdgeCosine(vertices, edges, direction = (0,0,1)):
         Coordinates of vertices.
     edges : [[indStart, indEnd],...,[indStart, indEnd]] (Nedges,2) integers
         Vertex indices of the starting and end points.
+
+    Returns
+    -------
+    vertices : np.ndarray (Nedges,2,3)
+        Edge vertices.
+
+    """
+    edges, vertices = np.array(edges), np.array(vertices)
+    edgeVertices = vertices[edges,:]
+    
+    return edgeVertices
+
+def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
+    """
+    Compute direction cosine with of edges with points in vertices, along a
+    specified direction.
+    
+    Note: use np.abs(cosines) to convert (-) to (+) direction.
+
+    Parameters
+    ----------
+    edgeVertices : np.ndarray (Nverts,2,3)
+        Coordinates of edge vertices.
     direction: tuple
         Direction the cosine is computed against.
 
@@ -212,9 +234,7 @@ def computeEdgeCosine(vertices, edges, direction = (0,0,1)):
         cosine with respect to direction.
 
     """
-    edges, vertices, direction = np.array(edges), np.array(vertices), np.array(direction)
-    
-    edgeVertices = vertices[edges,:] # shape = (Nedges,2,3)
+    direction = np.array(direction)
     edgeVectors = edgeVertices[:,1,:] - edgeVertices[:,0,:] # (Nedges,3)
 
     cosines = np.dot(edgeVectors,direction) \
@@ -235,11 +255,44 @@ def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
         
     return uniqueEdgesRetain
 
+def getFaceVertices(vertices, faces):
+    """
+    Get vertices selected by ind, after converting to np.ndarray.
 
+    Parameters
+    ----------
+    vertices : np.ndarray (Nverts,3)
+        Coordinates of vertices.
+    faces : [[v0, v1,...],...,[v0, v1, ...]] list of lists
+        Vertex indices of each face. Where each face may have different numbers of vertices
+
+    Returns
+    -------
+    vertices : list of np.ndarray
+        Selected indices.
+
+    """
+    
+    
+    pass
+
+def computeFaceNormals(faceVertices):
+    
+    pass
+
+def computeFaceArea(faceVertices):
+    
+    pass
+
+def computeFaceCentroid(faceVertices):
+    
+    pass
 
 if __name__ == "__main__":
     
     import matplotlib.pyplot as plt
+    # from mpl_toolkits.mplot3d import Axes3D
+    plt.ion()
     
     print('Running example for TrabeculaeVoronoi')
     Sxyz, Nxyz = (10,10,10), (5,5,5)
@@ -252,3 +305,12 @@ if __name__ == "__main__":
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
     uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction, randState=123)
     
+    edgeVertices = getEdgeVertices(vor.vertices, uniqueEdgesRetain)
+    edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
+    
+    # Visualize a face
+    face = uniqueFaces[-5]
+    fv = vor.vertices[face,:]
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    ax.plot(fv[:,0],fv[:,1],fv[:,2],'bo')
