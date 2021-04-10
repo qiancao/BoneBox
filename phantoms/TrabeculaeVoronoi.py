@@ -3,7 +3,7 @@ Phantoms.TrabeculaeVoronoi
 
 A voronoi-seeding-based trabecular bone phantom.
 
-Refactored April 2021.
+Revision April 2021.
 
 Authors:  Qian Cao, Xin Xu, Nada Kamona, Qin Li
 
@@ -243,7 +243,24 @@ def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
     return cosines
 
 def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
-    # Drop random edges uniformly throughout the entire VOI
+    """
+    Drop random edges uniformly throughout the entire VOI
+
+    Parameters
+    ----------
+    uniqueEdges : TYPE
+        DESCRIPTION.
+    dropFraction : TYPE, optional
+        DESCRIPTION. The default is 0.8.
+    randState : TYPE, optional
+        DESCRIPTION. The default is None.
+
+    Returns
+    -------
+    uniqueEdgesRetain : TYPE
+        DESCRIPTION.
+
+    """
     
     Nedges = len(uniqueEdges)
     
@@ -268,25 +285,90 @@ def getFaceVertices(vertices, faces):
 
     Returns
     -------
-    vertices : list of np.ndarray
-        Selected indices.
+    faceVertices : list of np.ndarray (FaceVerts,3)
+        Face vertex coordinates.
 
     """
     
+    faceVertices = [vertices[x,:] for x in faces]
     
-    pass
+    return faceVertices
 
 def computeFaceNormals(faceVertices):
-    
-    pass
+    """
+    Compute face normals for a list of face vertex coordinates.
 
-def computeFaceArea(faceVertices):
-    
-    pass
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
 
-def computeFaceCentroid(faceVertices):
+    Returns
+    -------
+    faceNormals : np.ndarray (Nfaces, 3)
+
+    """
     
-    pass
+    def computeNormal(verts):
+        # verts : nd.nparray (Npoints,3)
+        # TODO since coplanar, just use the first 3 vertices maybe revise this to
+        # select vertives evenly distributed around a polygon
+        verts = verts[:3,:]
+        
+        vec1 = verts[1,:] - verts[0,:]
+        vec2 = verts[2,:] - verts[0,:]
+        
+        vecn = np.cross(vec2,vec1)
+        
+        normal = vecn / np.linalg.norm(vecn)
+        
+        return normal
+    
+    faceNormals = [computeNormal(x) for x in faceVertices]
+    
+    return faceNormals
+
+def computeFaceAreas(faceVertices):
+    """
+    Compute face area for a list of face vertex coordinates.
+
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
+
+    Returns
+    -------
+    faceAreas : np.ndarray (Nfaces, 3)
+
+    """
+    def computeArea(verts):
+        return [] # TODO
+    
+    faceAreas = [computeArea(x) for x in faceVertices]
+    
+    return faceAreas
+
+def computeFaceCentroids(faceVertices):
+    """
+    Compute face centroid for a list of face vertex coordinates.
+
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
+
+    Returns
+    -------
+    faceCentroids : np.ndarray (Nfaces, 3)
+
+    """
+    def computeCentroid(verts):
+        return np.mean(verts,axis=0)
+    
+    faceCentroids = [computeCentroid(x) for x in faceVertices]
+    
+    return faceCentroids
 
 if __name__ == "__main__":
     
@@ -308,9 +390,11 @@ if __name__ == "__main__":
     edgeVertices = getEdgeVertices(vor.vertices, uniqueEdgesRetain)
     edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
     
-    # Visualize a face
-    face = uniqueFaces[-5]
-    fv = vor.vertices[face,:]
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    ax.plot(fv[:,0],fv[:,1],fv[:,2],'bo')
+    faceVertices = getFaceVertices(vor.vertices, uniqueFaces)
+    
+    # # Visualize a face
+    # face = uniqueFaces[-5]
+    # fv = vor.vertices[face,:]
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.plot(fv[:,0],fv[:,1],fv[:,2],'bo')
