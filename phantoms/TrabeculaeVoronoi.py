@@ -84,7 +84,9 @@ def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=
     # Generate a random array for perturbation from [0,1)
     if randState is not None:
         r = np.random.RandomState(randState)
-    rarr = r.random((Np,3))
+        rarr = r.random((Np,3))
+    else:
+        rarr = np.random.random((Np,3))
         
     # Sample perturbation from sphere
     R = rarr[:,0]*Rxyz
@@ -242,10 +244,10 @@ def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
     
     return cosines
 
-def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
+def filterEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
     """
     Drop random edges uniformly throughout the entire VOI
-
+    
     Parameters
     ----------
     uniqueEdges : TYPE
@@ -261,16 +263,22 @@ def dropEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
         DESCRIPTION.
 
     """
+    # TODO does other edge-drop schemes belong here?
     
     Nedges = len(uniqueEdges)
     
     if isinstance(dropFraction, float):
         Nretain = np.round(Nedges*dropFraction).astype(int)
-        retain_ind = np.random.choice(Nedges, Nretain, replace=False)
         
-    uniqueEdgesRetain = [uniqueEdges[x] for x in retain_ind]
+        if randState is not None:
+            r = np.random.RandomState(randState)
+            retainInd = r.choice(Nedges, Nretain, replace=False)
+        else:
+            retainInd = np.random.choice(Nedges, Nretain, replace=False)
         
-    return uniqueEdgesRetain
+    uniqueEdgesRetain = [uniqueEdges[x] for x in retainInd]
+        
+    return uniqueEdgesRetain, retainInd
 
 def getFaceVertices(vertices, faces):
     """
@@ -366,22 +374,23 @@ def computeFaceAreas(faceVertices):
 
     """
     def computeArea(verts):
-        # compute vertices for a list of vertices
+        # compute area for a list of coplanar 3D vertices
         
         v0 = verts[0,:]
-        Nverts = len(verts)
-        
         vk = verts[2:,:] - v0
         vj = verts[1:-1,:] - v0
         
-        areas = np.linalg.norm(np.cross(vk,vj))/2
-        area = np.sum(areas)
+        # ||sum(vk x vj)||/2
+        area = np.linalg.norm(np.sum(np.cross(vk,vj,axis=1),axis=0))/2
         
         return area
     
     faceAreas = [computeArea(x) for x in faceVertices]
     
     return faceAreas
+
+def filterFacesRandomUniform():
+    pass
 
 if __name__ == "__main__":
     
@@ -390,6 +399,8 @@ if __name__ == "__main__":
     plt.ion()
     
     print('Running example for TrabeculaeVoronoi')
+    
+    # Parameters for Trabecular Bone Phantom
     Sxyz, Nxyz = (10,10,10), (5,5,5)
     Rxyz = 0.5
     dropFraction = 0.8
@@ -399,10 +410,9 @@ if __name__ == "__main__":
     ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
     vor, ind = applyVoronoi(ppoints, Sxyz)
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
-    uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction, randState=123)
-    
+
     # Compute edge cosines
-    edgeVertices = getEdgeVertices(vor.vertices, uniqueEdgesRetain)
+    edgeVertices = getEdgeVertices(vor.vertices, uniqueEdges)
     edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
     
     # Compute face properties
@@ -411,7 +421,13 @@ if __name__ == "__main__":
     faceCentroids = computeFaceCentroids(faceVertices)
     faceNormas = computeFaceNormals(faceVertices)
     
-    
+    # Filter random edges and faces
+    uniqueEdgesRetain, edgesRetainInd = filterEdgesRandomUniform(uniqueEdges, 
+                                                                 dropFraction, 
+                                                                 randState=123)
+    uniqueFacesRetain, facesRetainInd = filterFacesRandomUniform(uniqueFaces, 
+                                                                 dropFraction, 
+                                                                 randState=123)
     
     # # Visualize a face
     # face = uniqueFaces[-5]
