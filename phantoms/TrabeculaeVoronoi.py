@@ -371,10 +371,12 @@ def computeFaceAreas(faceVertices):
         v0 = verts[0,:]
         Nverts = len(verts)
         
-        for vk in range(2, Nverts): # start from 0
-            v2 = verts[vk,:]
-            v1 = verts[vk-1,:]
-            # TODO compute norm of cross product, also vectorize this loop
+        vk = verts[2:,:]
+        vj = verts[1:-1,:]
+        
+        areas = 
+        
+        # TODO: cross product - norm - sum
         
         return area
     
