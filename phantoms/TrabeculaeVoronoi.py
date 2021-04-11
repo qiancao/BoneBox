@@ -244,7 +244,7 @@ def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
     
     return cosines
 
-def filterEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
+def filterEdgesRandomUniform(uniqueEdges, retainFraction = 0.8, randState=None):
     """
     Drop random edges uniformly throughout the entire VOI
     
@@ -252,7 +252,7 @@ def filterEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
     ----------
     uniqueEdges : TYPE
         DESCRIPTION.
-    dropFraction : TYPE, optional
+    retainFraction : TYPE, optional
         DESCRIPTION. The default is 0.8.
     randState : TYPE, optional
         DESCRIPTION. The default is None.
@@ -267,8 +267,8 @@ def filterEdgesRandomUniform(uniqueEdges, dropFraction = 0.8, randState=None):
     
     Nedges = len(uniqueEdges)
     
-    if isinstance(dropFraction, float):
-        Nretain = np.round(Nedges*dropFraction).astype(int)
+    if isinstance(retainFraction, float):
+        Nretain = np.round(Nedges*retainFraction).astype(int)
         
         if randState is not None:
             r = np.random.RandomState(randState)
@@ -403,7 +403,8 @@ if __name__ == "__main__":
     # Parameters for Trabecular Bone Phantom
     Sxyz, Nxyz = (10,10,10), (5,5,5)
     Rxyz = 0.5
-    dropFraction = 0.8
+    edgesRetainFraction = 0.8
+    facesRetainFraction = 0.8
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
@@ -423,10 +424,10 @@ if __name__ == "__main__":
     
     # Filter random edges and faces
     uniqueEdgesRetain, edgesRetainInd = filterEdgesRandomUniform(uniqueEdges, 
-                                                                 dropFraction, 
+                                                                 edgesRetainFraction, 
                                                                  randState=123)
     uniqueFacesRetain, facesRetainInd = filterFacesRandomUniform(uniqueFaces, 
-                                                                 dropFraction, 
+                                                                 facesRetainFraction, 
                                                                  randState=123)
     
     # # Visualize a face
