@@ -371,12 +371,11 @@ def computeFaceAreas(faceVertices):
         v0 = verts[0,:]
         Nverts = len(verts)
         
-        vk = verts[2:,:]
-        vj = verts[1:-1,:]
+        vk = verts[2:,:] - v0
+        vj = verts[1:-1,:] - v0
         
-        areas = 
-        
-        # TODO: cross product - norm - sum
+        areas = np.linalg.norm(np.cross(vk,vj))/2
+        area = np.sum(areas)
         
         return area
     
@@ -395,16 +394,24 @@ if __name__ == "__main__":
     Rxyz = 0.5
     dropFraction = 0.8
     
+    # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
     ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
     vor, ind = applyVoronoi(ppoints, Sxyz)
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
     uniqueEdgesRetain = dropEdgesRandomUniform(uniqueEdges, dropFraction, randState=123)
     
+    # Compute edge cosines
     edgeVertices = getEdgeVertices(vor.vertices, uniqueEdgesRetain)
     edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
     
+    # Compute face properties
     faceVertices = getFaceVertices(vor.vertices, uniqueFaces)
+    faceAreas = computeFaceAreas(faceVertices)
+    faceCentroids = computeFaceCentroids(faceVertices)
+    faceNormas = computeFaceNormals(faceVertices)
+    
+    
     
     # # Visualize a face
     # face = uniqueFaces[-5]
