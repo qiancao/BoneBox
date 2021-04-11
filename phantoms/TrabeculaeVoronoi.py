@@ -328,27 +328,6 @@ def computeFaceNormals(faceVertices):
     
     return faceNormals
 
-def computeFaceAreas(faceVertices):
-    """
-    Compute face area for a list of face vertex coordinates.
-
-    Parameters
-    ----------
-    faceVertices : list of np.ndarrays (FaceVerts,3)'s
-        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
-
-    Returns
-    -------
-    faceAreas : np.ndarray (Nfaces, 3)
-
-    """
-    def computeArea(verts):
-        return [] # TODO
-    
-    faceAreas = [computeArea(x) for x in faceVertices]
-    
-    return faceAreas
-
 def computeFaceCentroids(faceVertices):
     """
     Compute face centroid for a list of face vertex coordinates.
@@ -369,6 +348,39 @@ def computeFaceCentroids(faceVertices):
     faceCentroids = [computeCentroid(x) for x in faceVertices]
     
     return faceCentroids
+
+def computeFaceAreas(faceVertices):
+    """
+    Compute face area for a list of face vertex coordinates.
+    
+    https://math.stackexchange.com/questions/3207981/caculate-area-of-polygon-in-3d
+
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
+
+    Returns
+    -------
+    faceAreas : np.ndarray (Nfaces, 3)
+
+    """
+    def computeArea(verts):
+        # compute vertices for a list of vertices
+        
+        v0 = verts[0,:]
+        Nverts = len(verts)
+        
+        for vk in range(2, Nverts): # start from 0
+            v2 = verts[vk,:]
+            v1 = verts[vk-1,:]
+            # TODO compute norm of cross product, also vectorize this loop
+        
+        return area
+    
+    faceAreas = [computeArea(x) for x in faceVertices]
+    
+    return faceAreas
 
 if __name__ == "__main__":
     
