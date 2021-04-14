@@ -405,10 +405,11 @@ if __name__ == "__main__":
     Rxyz = 0.5
     edgesRetainFraction = 0.8
     facesRetainFraction = 0.8
+    randState = 123 # for repeatability
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
-    ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=123)
+    ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=randState)
     vor, ind = applyVoronoi(ppoints, Sxyz)
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
 
@@ -425,10 +426,10 @@ if __name__ == "__main__":
     # Filter random edges and faces
     uniqueEdgesRetain, edgesRetainInd = filterEdgesRandomUniform(uniqueEdges, 
                                                                  edgesRetainFraction, 
-                                                                 randState=123)
+                                                                 randState=randState)
     uniqueFacesRetain, facesRetainInd = filterFacesRandomUniform(uniqueFaces, 
                                                                  facesRetainFraction, 
-                                                                 randState=123)
+                                                                 randState=randState)
     
     # # Visualize a face
     # face = uniqueFaces[-5]
