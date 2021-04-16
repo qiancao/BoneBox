@@ -389,8 +389,24 @@ def computeFaceAreas(faceVertices):
     
     return faceAreas
 
-def filterFacesRandomUniform():
-    pass
+def filterFacesRandomUniform(uniqueFaces, retainFraction, randState=None):
+    
+    # TODO does other edge-drop schemes belong here?
+    
+    Nfaces = len(uniqueFaces)
+    
+    if isinstance(retainFraction, float):
+        Nretain = np.round(Nfaces*retainFraction).astype(int)
+        
+        if randState is not None:
+            r = np.random.RandomState(randState)
+            retainInd = r.choice(Nfaces, Nretain, replace=False)
+        else:
+            retainInd = np.random.choice(Nfaces, Nretain, replace=False)
+        
+    uniqueFacesRetain = [uniqueFaces[x] for x in retainInd]
+        
+    return uniqueFacesRetain, retainInd
 
 if __name__ == "__main__":
     
