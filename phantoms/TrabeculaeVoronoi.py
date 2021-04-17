@@ -408,6 +408,10 @@ def filterFacesRandomUniform(uniqueFaces, retainFraction, randState=None):
         
     return uniqueFacesRetain, retainInd
 
+def makeVolume(vertices,edgeVertices,faceVertices):
+    # Converts vertex list, edge vertex index and face vertex index to volume.
+    pass
+
 if __name__ == "__main__":
     
     import matplotlib.pyplot as plt
