@@ -408,9 +408,44 @@ def filterFacesRandomUniform(uniqueFaces, retainFraction, randState=None):
         
     return uniqueFacesRetain, retainInd
 
-def makeVolume(vertices,edgeVertices,faceVertices):
-    # Converts vertex list, edge vertex index and face vertex index to volume.
+def convertAbs2Array(vertices, voxelSize, volumeDimensionVoxels):
+    # convert absolute coordinates (e.g. in mm) to array coordinates (array indices)
+    # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
+    
+    voxelSize, volumeDimensionVoxels= np.array(voxelSize), np.array(volumeDimensionVoxels)
+    shiftOriginToCorner = voxelSize * volumeDimensionVoxels / 2
+    vertices = (vertices + shiftOriginToCorner) / voxelSize
+    
+    return vertices
+
+def convertArray2Abs(vertices, voxelSize, volumeDimensionVoxels):
+    # convert array coordinates to absolute coordinates 
+    # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
+    
+    voxelSize, volumeDimensionVoxels= np.array(voxelSize), np.array(volumeDimensionVoxels)
+    shiftOriginToCorner = voxelSize * volumeDimensionVoxels / 2
+    vertices = vertices * voxelSize - shiftOriginToCorner
+    
+    return vertices
+
+def drawLine(volume, vertices, edgeVertices):
+    # vertices should be in array coordinates (corner origin, unit = voxels)
+    
     pass
+
+def drawFace(volume, vertices, edgeVertices):
+    # vertices should be in array coordinates (corner origin, unit = voxels)
+    
+    pass
+
+def makeSkeletonVolume(vertices, edgeVertices, faceVertices, voxelSize, volumeDimensionVoxels):
+    # Converts vertex list, edge vertex index and face vertex index to volume.
+    
+    volume = np.zeros(volumeDimensionVoxels, dtype=int)
+    
+    # convert vertices to array-coordinates ()
+    
+    return volume
 
 if __name__ == "__main__":
     
@@ -420,12 +455,16 @@ if __name__ == "__main__":
     
     print('Running example for TrabeculaeVoronoi')
     
-    # Parameters for Trabecular Bone Phantom
+    # Parameters for generating phantom mesh
     Sxyz, Nxyz = (10,10,10), (5,5,5)
     Rxyz = 0.5
     edgesRetainFraction = 0.8
     facesRetainFraction = 0.8
     randState = 123 # for repeatability
+    
+    # Parameters for generating phantom volume
+    voxelSize = np.array(Sxyz)/10
+    volumeDimensionVoxels = 
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
