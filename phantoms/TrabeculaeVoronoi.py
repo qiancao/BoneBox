@@ -15,6 +15,8 @@ from scipy.spatial import Voronoi, Delaunay
 # import optimesh # May be a good idea for CVT post perturbation
 from itertools import chain # list unpacking
 
+from skimage.draw import line_nd
+
 import utils
 
 def makeSeedPointsCartesian(Sxyz, Nxyz):
@@ -408,42 +410,66 @@ def filterFacesRandomUniform(uniqueFaces, retainFraction, randState=None):
         
     return uniqueFacesRetain, retainInd
 
-def convertAbs2Array(vertices, voxelSize, volumeDimensionVoxels):
+def convertAbs2Array(vertices, voxelSize, volumeSizeVoxels):
     # convert absolute coordinates (e.g. in mm) to array coordinates (array indices)
     # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
     
-    voxelSize, volumeDimensionVoxels= np.array(voxelSize), np.array(volumeDimensionVoxels)
-    shiftOriginToCorner = voxelSize * volumeDimensionVoxels / 2
-    vertices = (vertices + shiftOriginToCorner) / voxelSize
+    voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
+    shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
+    verticesArray = (vertices + shiftOriginToCorner) / voxelSize
     
-    return vertices
+    return verticesArray
 
-def convertArray2Abs(vertices, voxelSize, volumeDimensionVoxels):
+def convertArray2Abs(vertices, voxelSize, volumeSizeVoxels):
     # convert array coordinates to absolute coordinates 
     # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
     
-    voxelSize, volumeDimensionVoxels= np.array(voxelSize), np.array(volumeDimensionVoxels)
-    shiftOriginToCorner = voxelSize * volumeDimensionVoxels / 2
-    vertices = vertices * voxelSize - shiftOriginToCorner
+    voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
+    shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
+    verticesAbs = vertices * voxelSize - shiftOriginToCorner
     
-    return vertices
+    return verticesAbs
 
-def drawLine(volume, vertices, edgeVertices):
-    # vertices should be in array coordinates (corner origin, unit = voxels)
+def drawLine(volume, vertices, edgeVertexInd):
+    # Vertices should be in array coordinates (corner origin, unit = voxels)
+    
+    start = vertices[edgeVertexInd[0],:]
+    end = vertices[edgeVertexInd[1],:]
+    
+    lin = line_nd(start, end, endpoint = True)
+    volume[lin] = 1
+
+def drawFace(volume, vertices, faceVertexInd):
+    # Vertices should be in array coordinates (corner origin, unit = voxels)
     
     pass
 
-def drawFace(volume, vertices, edgeVertices):
-    # vertices should be in array coordinates (corner origin, unit = voxels)
-    
-    pass
-
-def makeSkeletonVolume(vertices, edgeVertices, faceVertices, voxelSize, volumeDimensionVoxels):
+def makeSkeletonVolume(vertices, edgeInds, faceInds, 
+                       voxelSize, volumeSizeVoxels):
     # Converts vertex list, edge vertex index and face vertex index to volume.
     
-    volume = np.zeros(volumeDimensionVoxels, dtype=int)
+    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
     
-    # convert vertices to array-coordinates ()
+    # Convert vertices to array-coordinates
+    verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
+    
+    # TODO finish this off here
+    
+    return volume
+
+def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
+    # Converts vertex list, edge vertex index and face vertex index to volume.
+    # This function only assigns voxels from edges.
+    
+    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    
+    # Convert vertices to array-coordinates
+    verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
+    
+    edgeInds = np.array(edgeInds)
+    
+    for ii in range(edgeInds.shape[0]):
+        drawLine(volume, verticesArray, edgeInds[ii,:])
     
     return volume
 
@@ -456,15 +482,15 @@ if __name__ == "__main__":
     print('Running example for TrabeculaeVoronoi')
     
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (10,10,10), (5,5,5)
+    Sxyz, Nxyz = (10,10,10), (5,5,5) # volume extent in XYZ, number of seeds along XYZ
     Rxyz = 0.5
-    edgesRetainFraction = 0.8
-    facesRetainFraction = 0.8
+    edgesRetainFraction = 0.5
+    facesRetainFraction = 0.5
     randState = 123 # for repeatability
     
     # Parameters for generating phantom volume
-    voxelSize = np.array(Sxyz)/10
-    volumeDimensionVoxels = 
+    volumeSizeVoxels = (200,200,200)
+    voxelSize = np.array(Sxyz) / np.array(volumeSizeVoxels)
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
@@ -489,6 +515,9 @@ if __name__ == "__main__":
     uniqueFacesRetain, facesRetainInd = filterFacesRandomUniform(uniqueFaces, 
                                                                  facesRetainFraction, 
                                                                  randState=randState)
+    
+    volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdges, voxelSize, volumeSizeVoxels)
+    
     
     # # Visualize a face
     # face = uniqueFaces[-5]
