@@ -267,13 +267,15 @@ def filterEdgesRandomUniform(uniqueEdges, retainFraction = 0.8, randState=None):
     """
     # TODO does other edge-drop schemes belong here?
     
-    Nedges = len(uniqueEdges)
+    uniqueEdges = np.array(uniqueEdges)
+    
+    Nedges = uniqueEdges.shape[0]
     
     if isinstance(retainFraction, float):
         Nretain = np.round(Nedges*retainFraction).astype(int)
         
         if randState is not None:
-            r = np.random.RandomState(randState)
+            r = np.random.RandomState(seed=randState)
             retainInd = r.choice(Nedges, Nretain, replace=False)
         else:
             retainInd = np.random.choice(Nedges, Nretain, replace=False)
@@ -416,7 +418,9 @@ def convertAbs2Array(vertices, voxelSize, volumeSizeVoxels):
     
     voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
-    verticesArray = (vertices + shiftOriginToCorner) / voxelSize
+    
+    # Note, array coordinates start at 0.5 (or 1?)
+    verticesArray = (vertices + shiftOriginToCorner) / voxelSize - 1
     
     return verticesArray
 
@@ -426,7 +430,7 @@ def convertArray2Abs(vertices, voxelSize, volumeSizeVoxels):
     
     voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
-    verticesAbs = vertices * voxelSize - shiftOriginToCorner
+    verticesAbs = (vertices+1) * voxelSize - shiftOriginToCorner
     
     return verticesAbs
 
@@ -436,7 +440,11 @@ def drawLine(volume, vertices, edgeVertexInd):
     start = vertices[edgeVertexInd[0],:]
     end = vertices[edgeVertexInd[1],:]
     
-    lin = line_nd(start, end, endpoint = True)
+    lin = line_nd(start, end, endpoint = False)
+    
+    # DEBUG
+    print(lin)
+    
     volume[lin] = 1
 
 def drawFace(volume, vertices, faceVertexInd):
@@ -469,6 +477,8 @@ def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
     edgeInds = np.array(edgeInds)
     
     for ii in range(edgeInds.shape[0]):
+        print(ii) # DEBUG
+        print(edgeInds[ii,:]) # DEBUG
         drawLine(volume, verticesArray, edgeInds[ii,:])
     
     return volume
@@ -482,8 +492,8 @@ if __name__ == "__main__":
     print('Running example for TrabeculaeVoronoi')
     
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (10,10,10), (5,5,5) # volume extent in XYZ, number of seeds along XYZ
-    Rxyz = 0.5
+    Sxyz, Nxyz = (10,10,10), (5,5,5) # volume extent in XYZ (mm), number of seeds along XYZ
+    Rxyz = 2.
     edgesRetainFraction = 0.5
     facesRetainFraction = 0.5
     randState = 123 # for repeatability
@@ -497,7 +507,7 @@ if __name__ == "__main__":
     ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=randState)
     vor, ind = applyVoronoi(ppoints, Sxyz)
     uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
-
+    
     # Compute edge cosines
     edgeVertices = getEdgeVertices(vor.vertices, uniqueEdges)
     edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
