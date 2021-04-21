@@ -16,6 +16,7 @@ from scipy.spatial import Voronoi, Delaunay
 from itertools import chain # list unpacking
 
 from skimage.draw import line_nd
+from scipy.ndimage import binary_dilation
 
 import utils
 
@@ -265,20 +266,20 @@ def filterEdgesRandomUniform(uniqueEdges, retainFraction = 0.8, randState=None):
         DESCRIPTION.
 
     """
-    # TODO does other edge-drop schemes belong here?
+    # TODO does other edge-drop schemes belong here? Maybe use another function for that
     
     uniqueEdges = np.array(uniqueEdges)
     
     Nedges = uniqueEdges.shape[0]
     
-    if isinstance(retainFraction, float):
-        Nretain = np.round(Nedges*retainFraction).astype(int)
-        
-        if randState is not None:
-            r = np.random.RandomState(seed=randState)
-            retainInd = r.choice(Nedges, Nretain, replace=False)
-        else:
-            retainInd = np.random.choice(Nedges, Nretain, replace=False)
+    # if isinstance(retainFraction, float):
+    Nretain = np.round(Nedges*retainFraction).astype(int)
+    
+    if randState is not None:
+        r = np.random.RandomState(seed=randState)
+        retainInd = r.choice(Nedges, Nretain, replace=False)
+    else:
+        retainInd = np.random.choice(Nedges, Nretain, replace=False)
         
     uniqueEdgesRetain = [uniqueEdges[x] for x in retainInd]
         
@@ -399,14 +400,14 @@ def filterFacesRandomUniform(uniqueFaces, retainFraction, randState=None):
     
     Nfaces = len(uniqueFaces)
     
-    if isinstance(retainFraction, float):
-        Nretain = np.round(Nfaces*retainFraction).astype(int)
-        
-        if randState is not None:
-            r = np.random.RandomState(randState)
-            retainInd = r.choice(Nfaces, Nretain, replace=False)
-        else:
-            retainInd = np.random.choice(Nfaces, Nretain, replace=False)
+    # if isinstance(retainFraction, float):
+    Nretain = np.round(Nfaces*retainFraction).astype(int)
+    
+    if randState is not None:
+        r = np.random.RandomState(randState)
+        retainInd = r.choice(Nfaces, Nretain, replace=False)
+    else:
+        retainInd = np.random.choice(Nfaces, Nretain, replace=False)
         
     uniqueFacesRetain = [uniqueFaces[x] for x in retainInd]
         
@@ -419,18 +420,20 @@ def convertAbs2Array(vertices, voxelSize, volumeSizeVoxels):
     voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
     
-    # Note, array coordinates start at 0.5 (or 1?)
-    verticesArray = (vertices + shiftOriginToCorner) / voxelSize - 1
+    # Note, array coordinates start at 0.5
+    verticesArray = (vertices + shiftOriginToCorner) / voxelSize - 0.5
     
     return verticesArray
 
 def convertArray2Abs(vertices, voxelSize, volumeSizeVoxels):
-    # convert array coordinates to absolute coordinates 
+    # convert array coordinates to absolute coordinates
     # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
     
     voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
-    verticesAbs = (vertices+1) * voxelSize - shiftOriginToCorner
+    
+    # Note, array coordinates start at 0.5
+    verticesAbs = (vertices + 0.5) * voxelSize - shiftOriginToCorner
     
     return verticesAbs
 
@@ -441,15 +444,11 @@ def drawLine(volume, vertices, edgeVertexInd):
     end = vertices[edgeVertexInd[1],:]
     
     lin = line_nd(start, end, endpoint = False)
-    
-    # DEBUG
-    print(lin)
-    
+
     volume[lin] = 1
 
 def drawFace(volume, vertices, faceVertexInd):
     # Vertices should be in array coordinates (corner origin, unit = voxels)
-    
     pass
 
 def makeSkeletonVolume(vertices, edgeInds, faceInds, 
@@ -477,11 +476,20 @@ def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
     edgeInds = np.array(edgeInds)
     
     for ii in range(edgeInds.shape[0]):
-        print(ii) # DEBUG
-        print(edgeInds[ii,:]) # DEBUG
         drawLine(volume, verticesArray, edgeInds[ii,:])
     
     return volume
+
+def dilateVolumeSphereUniform(volume, radius):
+    # radius is in units of voxels
+    
+    diam = np.arange(-radius,radius+1)
+    xx, yy, zz = np.meshgrid(diam, diam, diam)
+    sphere = (xx**2+yy**2+zz**2<=radius**2)
+    
+    volumeDilated = binary_dilation(volume,sphere)
+    
+    return volumeDilated
 
 if __name__ == "__main__":
     
@@ -492,10 +500,11 @@ if __name__ == "__main__":
     print('Running example for TrabeculaeVoronoi')
     
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (10,10,10), (5,5,5) # volume extent in XYZ (mm), number of seeds along XYZ
-    Rxyz = 2.
+    Sxyz, Nxyz = (10,10,10), (10,10,10) # volume extent in XYZ (mm), number of seeds along XYZ
+    Rxyz = 1.
     edgesRetainFraction = 0.5
     facesRetainFraction = 0.5
+    dilationRadius = 3 # (voxels)
     randState = 123 # for repeatability
     
     # Parameters for generating phantom volume
@@ -527,7 +536,7 @@ if __name__ == "__main__":
                                                                  randState=randState)
     
     volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdges, voxelSize, volumeSizeVoxels)
-    
+    volumeDilated = dilateVolumeSphereUniform(volume, dilationRadius)
     
     # # Visualize a face
     # face = uniqueFaces[-5]
