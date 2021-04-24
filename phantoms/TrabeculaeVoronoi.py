@@ -538,6 +538,12 @@ if __name__ == "__main__":
     volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdges, voxelSize, volumeSizeVoxels)
     volumeDilated = dilateVolumeSphereUniform(volume, dilationRadius)
     
+    # Visualize all edges
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    for ii in range(edgeVertices.shape[0]):
+        ax.plot(edgeVertices[ii,:,0],edgeVertices[ii,:,1],edgeVertices[ii,:,2],'b-')
+    
     # # Visualize a face
     # face = uniqueFaces[-5]
     # fv = vor.vertices[face,:]
