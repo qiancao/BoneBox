@@ -17,8 +17,27 @@ Based on:
 """
 
 import numpy as np
+from .utils import runningMean, runningStd
 
-def computeImageTBS(image, radius=10, pixelSize=(1,1)):
+def getIndXY(imageShape, radius=10):
+    # Coordinates in image where TBS is computed.
+    
+    indX = range(radius, imageShape[0]-radius)
+    indY = range(radius, imageShape[1]-radius)
+    
+    return indX, indY
+
+def getLogk(radius=10, pixelSize=(1,1)):
+    # Coordinates of the ROI centered on pixel where TBS is evaluated.
+    
+    indR = np.arange(-radius, radius+1)
+    xx, yy = np.meshgrid(indR*pixelSize[0], indR*pixelSize[1])
+    k = np.sqrt(xx**2+yy**2).flatten()
+    logk = np.log(k)
+    
+    return logk
+
+def computeTBSImage(image, radius=10, pixelSize=(1,1)):
     # image : 2D np.ndarray.
     # radius (pixels) : radius for computing pixel-wise TBS (radius=10 will result in 21**2-pixel ROI).
     # pixelSize (mm) : used to scale final TBS value.
@@ -30,15 +49,9 @@ def computeImageTBS(image, radius=10, pixelSize=(1,1)):
     imageTBS = np.empty(np.array(image.shape))
     imageTBS[:] = np.nan
     
-    # Coordinates in image where TBS is computed.
-    indX = range(radius, image.shape[0]-radius)
-    indY = range(radius, image.shape[1]-radius)
-    
-    # Coordinates of the ROI centered on pixel where TBS is evaluated.
-    indR = np.arange(-radius, radius+1)
-    xx, yy = np.meshgrid(indR*pixelSize[0], indR*pixelSize[1])
-    k = np.sqrt(xx**2+yy**2).flatten()
-    logk = np.log(k)
+    # Set up ROI
+    indX, indY = getIndXY(image.shape, radius)
+    logk = getLogk(radius, pixelSize)
     
     # Mask out center pixel: ind=len(logk)//2
     mask = np.ones(logk.shape,dtype=bool)
@@ -53,6 +66,32 @@ def computeImageTBS(image, radius=10, pixelSize=(1,1)):
             imageTBS[x,y] = linfit[0]
     
     return imageTBS
+
+def computeTBSVariogram(image, radius=10, pixelSize=(1,1)):
+    # computes log variogram (running mean and std)
+    
+    # Set up ROI
+    indX, indY = getIndXY(image.shape, radius)
+    logk = getLogk(radius, pixelSize)
+    
+    # Mean and standard deviation of logVs
+    logVmean = np.zeros(logk.shape)
+    logVstd = np.zeros(logk.shape)
+    logVn = np.zeros(logk.shape) # keeps track of number of valid points
+    
+    # Mask out center pixel: ind=len(logk)//2
+    mask = np.ones(logk.shape,dtype=bool)
+    mask[len(logk)//2] = 0
+    
+    for x in indX:
+        for y in indY:
+            V = (image[x-radius:x+radius+1, y-radius:y+radius+1].flatten() - image[x,y])**2
+            logV = np.log(V)
+            idx = mask & np.isfinite(logV)
+            
+            
+    
+    return logk, logVmean, logVstd
 
 if __name__ == "__main__":
     
@@ -71,7 +110,7 @@ if __name__ == "__main__":
          / np.prod(np.array(pixelSize))
     # [mm3][g/mm3]/[mm2]
     
-    projectionTBS = computeTBS(projectionImage, radius=radiusTBS, pixelSize=pixelSize)
+    projectionTBS = computeTBSImage(projectionImage, radius=radiusTBS, pixelSize=pixelSize)
     
     plt.figure(figsize=(12.6, 4.66))
     plt.subplot(1,2,1)
