@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 
 """
-Metrics.TBS
+
+metrics.TBS
 
 Trabecular Bone Score for Projection Images
 
@@ -17,7 +18,6 @@ Based on:
 """
 
 import numpy as np
-from .utils import runningMean, runningStd
 
 def getIndXY(imageShape, radius=10):
     # Coordinates in image where TBS is computed.
@@ -67,6 +67,18 @@ def computeTBSImage(image, radius=10, pixelSize=(1,1)):
     
     return imageTBS
 
+def updateMeanStdN(mean0, std0, n0, x, idx):
+    # Welford's running standard deviation algorithm
+    # based on https://www.kite.com/python/answers/how-to-find-a-running-standard-deviation-in-python
+    
+    mean1, std1, n1 = mean0, std0, n0
+    
+    n1[idx] = n0[idx] + 1
+    mean1[idx] = mean0[idx] + (x[idx]-mean0[idx]) / n0[idx]
+    std1[idx] = std0[idx] + (x[idx] - mean0[idx]) * (x[idx] - mean1[idx])
+    
+    return mean1, std1, n1
+
 def computeTBSVariogram(image, radius=10, pixelSize=(1,1)):
     # computes log variogram (running mean and std)
     
@@ -89,9 +101,10 @@ def computeTBSVariogram(image, radius=10, pixelSize=(1,1)):
             logV = np.log(V)
             idx = mask & np.isfinite(logV)
             
-            
+            # Tabulate running mean and standard deviation
+            logVmean, logVstd, logVn = updateMeanStdN(logVmean, logVstd, logVn, logV, idx)
     
-    return logk, logVmean, logVstd
+    return logk, logVmean, logVstd, logVn
 
 if __name__ == "__main__":
     
@@ -101,16 +114,18 @@ if __name__ == "__main__":
     rhoBone = 2e-3 # g/mm3
     voxelSize = (0.05, 0.05, 0.05) # mm
     pixelSize = (0.05, 0.05) # mm
-    radiusTBS = 4 # pixels
+    radiusTBS = 5 # pixels
     
     # Simulate a simple projection image and convert units to aBMD
-    roiBone, header = nrrd.read("../data/isodata_04216_roi_4.nrrd")
+    roiBone, header = nrrd.read("../../data/isodata_04216_roi_4.nrrd")
     roiBone[roiBone==255] = 1 # units for this is volume
     projectionImage = np.prod(np.array(voxelSize)) * rhoBone * np.sum(roiBone,axis=0).T \
          / np.prod(np.array(pixelSize))
     # [mm3][g/mm3]/[mm2]
     
     projectionTBS = computeTBSImage(projectionImage, radius=radiusTBS, pixelSize=pixelSize)
+    logk, logVmean, logVstd, logVn = \
+        computeTBSVariogram(projectionImage, radius=radiusTBS, pixelSize=pixelSize)
     
     plt.figure(figsize=(12.6, 4.66))
     plt.subplot(1,2,1)
