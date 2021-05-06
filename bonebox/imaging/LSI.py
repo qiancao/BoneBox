@@ -6,16 +6,56 @@ imaging.LSI
 
 Linear Shift-invariant Imaging Models of Blur and Noise
 
+A Fourier-domain implementation
+
 Author:  Qian Cao
 
 """
 
 import numpy as np
 
-def makeGaussMTF2D():
+def getFrequencyAxis(image, spacing):
+    # spacing: voxel or pixel size (mm)
+    # image: only used to retrieve shape
+    # returns list of frequencies
+    
+    freq = []
+    
+    N = image.shape
+    if len(N) != len(spacing):
+        raise(ValueError, "Dimension of image and spacing must match")
+    
+    for dim in range(N):
+        freq.append(np.fft.fftfreq(N[dim], spacing[dim]))
+        
+    return freq
+
+def imageFFT2D(image, spacing):
+    # spacing : pixel extent
+    
+    freq = getFrequencyAxis(image, spacing)
+    imageFFT = np.fft.fft2(image)
+    
+    return freq, imageFFT
+
+def imageFFT3D(image, spacing):
+    # spacing : voxel or pixel extent
+    
+    freq = getFrequencyAxis(image, spacing)
+    imageFFT = np.fft.fftn(image)
+    
+    return freq, imageFFT
+
+def rebin2D(image, pixelSize, pixelSizeTarget, origin=(0,0,0)):
     pass
 
-def makeGaussNPS2D():
+def rebin3D(image, voxelSize, voxelSizeTarget, origin=(0,0,0)):
+    pass
+
+def makeGaussMTF2D(F):
+    pass
+
+def makeGaussNPS2D(F):
     pass
 
 def makeGaussMTF3D():
