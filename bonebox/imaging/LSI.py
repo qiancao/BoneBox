@@ -31,6 +31,7 @@ def getFrequencyAxis(image, spacing):
     return freq
 
 def imageFFT2D(image, spacing):
+    # apply fft on projection images
     # spacing : pixel extent
     
     freq = getFrequencyAxis(image, spacing)
@@ -39,14 +40,15 @@ def imageFFT2D(image, spacing):
     return freq, imageFFT
 
 def imageFFT3D(image, spacing):
-    # spacing : voxel or pixel extent
+    # apply fft on reconstructed images
+    # spacing : voxel or extent
     
     freq = getFrequencyAxis(image, spacing)
     imageFFT = np.fft.fftn(image)
     
     return freq, imageFFT
 
-def rebin2D(image, pixelSize, pixelSizeTarget, origin=(0,0,0)):
+def rebin2D(image, pixelSize, pixelSizeTarget, origin=(0,0)):
     pass
 
 def rebin3D(image, voxelSize, voxelSizeTarget, origin=(0,0,0)):
@@ -76,3 +78,6 @@ def applyMTF3D(image, F, MTF):
 def applyNPS3D(image, F, MTF, randState):
     pass
 
+
+if __name__ == "__main__":
+    pass
