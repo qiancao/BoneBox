@@ -59,11 +59,18 @@ def computeTBSImage(image, radius=10, pixelSize=(1,1)):
     
     for x in indX:
         for y in indY:
+            
             V = (image[x-radius:x+radius+1, y-radius:y+radius+1].flatten() - image[x,y])**2
             logV = np.log(V)
             idx = mask & np.isfinite(logV)
-            linfit = np.polyfit(logk[idx],logV[idx],1)
-            imageTBS[x,y] = linfit[0]
+            
+            # edge case: idx can be *all false* (e.g., if all pixels of V are zero)
+            # also, 2 points required to fit a line
+            if any(idx) and (sum(idx) > 1):
+                linfit = np.polyfit(logk[idx],logV[idx],1)
+                imageTBS[x,y] = linfit[0]
+            else:
+                imageTBS[x,y] = np.nan
     
     return imageTBS
 
@@ -117,7 +124,7 @@ if __name__ == "__main__":
     radiusTBS = 5 # pixels
     
     # Simulate a simple projection image and convert units to aBMD
-    roiBone, header = nrrd.read("../../data/isodata_04216_roi_4.nrrd")
+    roiBone, header = nrrd.read("../../data/rois/isodata_04216_roi_4.nrrd")
     roiBone[roiBone==255] = 1 # units for this is volume
     projectionImage = np.prod(np.array(voxelSize)) * rhoBone * np.sum(roiBone,axis=0).T \
          / np.prod(np.array(pixelSize))
@@ -131,9 +138,12 @@ if __name__ == "__main__":
     plt.subplot(1,2,1)
     plt.imshow(projectionImage, cmap="gray")
     plt.axis("off")
-    plt.colorbar()
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=12)
 
     plt.subplot(1,2,2)
     plt.imshow(projectionTBS)
     plt.axis("off")
-    plt.colorbar()
+    plt.clim(0,3)
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=12)
