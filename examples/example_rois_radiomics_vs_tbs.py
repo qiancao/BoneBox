@@ -15,16 +15,10 @@ Example commands for generating radiomic features:
 
 import numpy as np
 import matplotlib.pyplot as plt
-# import nrrd
-# import radiomics
 import os
-# import re
-# from matplotlib import style
-# from sklearn.model_selection import train_test_split
 import pandas as pd
 import seaborn as sns
 from scipy.optimize import curve_fit
-# import string
 
 roi_dir = '../data/rois/'
 out_dir = "C://Users//Qian.Cao//tmp//"
@@ -219,7 +213,7 @@ print(rfr_params)
 # plt.gca().invert_yaxis()
 # plt.show()
 
-#%% Random Forest Regression - Cross Validate on Final Model
+#% Random Forest Regression - Cross Validate on Final Model
 
 ProjectionsPerBone = 13*2
 
@@ -232,16 +226,21 @@ roi_vm_mean_preds0 = np.empty((16,ProjectionsPerBone))
 roi_vm_mean_tests1 = np.empty((16,ProjectionsPerBone))
 roi_vm_mean_preds1 = np.empty((16,ProjectionsPerBone))
 
+roi_vm_mean_tests2 = np.empty((16,ProjectionsPerBone))
+roi_vm_mean_preds2 = np.empty((16,ProjectionsPerBone))
+
 fits = np.empty((16,2))
 fitps = np.empty((16,2))
 
 ccs = np.empty((16,1))
 ccs0 = np.empty((16,1))
 ccs1 = np.empty((16,1))
+ccs2 = np.empty((16,1))
 
 nrmses = np.empty((16,1))
 nrmses0 = np.empty((16,1))
 nrmses1 = np.empty((16,1))
+nrmses2 = np.empty((16,1))
 
 # nrmses_fit = np.empty((16,18))
 
@@ -294,6 +293,8 @@ for bb in range(16): # 16 bones total
     
     #% END BvTv ONLY
     
+    xbvtv = xdata
+
     #% TBS only
     
     xdata = proj_tbs[ProjectionsPerBone*bb:ProjectionsPerBone*bb+ProjectionsPerBone]
@@ -312,6 +313,37 @@ for bb in range(16): # 16 bones total
     roi_vm_mean_preds1[bb,:] = func(xdata,*popt)
     
     #% END BvTv ONLY
+    
+    xtbs = xdata
+    
+    #% Combination of BvTv and BMD
+    
+    # features_norm_train, roi_vm_mean_train = features_norm.copy(), roi_vm_mean.copy()
+    # features_norm_train = np.delete(features_norm_train,slice(ProjectionsPerBone*bb,ProjectionsPerBone*bb+ProjectionsPerBone),0)
+    # roi_vm_mean_train = np.delete(roi_vm_mean_train,slice(ProjectionsPerBone*bb,ProjectionsPerBone*bb+ProjectionsPerBone),0)
+        
+    # # xdata = proj_tbs[ProjectionsPerBone*bb:ProjectionsPerBone*bb+ProjectionsPerBone]
+    # xdata = np.vstack((xbvtv,xtbs)).T
+    # ydata = roi_vm_mean_test
+    
+    # rf = RandomForestRegressor(**rfr_params, n_jobs = -1,random_state =1)
+    # rf.fit(xdata, ydata)
+    # roi_vm_mean_pred = rf.predict(features_norm_test)
+    # roi_vm_mean_train_pred = rf.predict(features_norm_train)
+    
+    # popt, pcov = curve_fit(func, xdata, ydata)
+    
+    # residuals = ydata - func(xdata, *popt)
+    # ss_res = np.sum(residuals**2)
+    # ss_tot = np.sum((ydata-np.mean(ydata))**2)
+    # ccs2[bb] = (1 - (ss_res / ss_tot))
+    # nrmses1[bb] = np.sqrt(np.mean((func(xdata, *popt)-ydata)**2))/np.mean(ydata)
+    # # rmse = np.sqrt(np.mean((func(xdata, *popt)-ydata)**2))
+    
+    # roi_vm_mean_tests2[bb,:] = roi_vm_mean_test
+    # roi_vm_mean_preds2[bb,:] = func(xdata,*popt)
+    
+    # ENd BvTv + BMD
     
     #% Plot training set for proportional bias
     
@@ -361,6 +393,32 @@ fit0 = np.polyfit(roi_vm_mean_tests0.flatten(),roi_vm_mean_preds0.flatten(),1)
 fitp0 = np.polyval(fit0,pval)
 
 cc = np.corrcoef(roi_vm_mean_test,roi_vm_mean_pred)[0,1]
+
+#%% Plot of correlation coefficients
+
+# Radiomics vs TBS 
+plt.figure()
+plt.plot(ccs1, ccs,'ko')
+plt.xlabel("r2 TBS")
+plt.ylabel("r2 Radiomics")
+plt.axis('square')
+
+plt.plot([0,1],[0,1],'k-')
+
+plt.xlim(0,1)
+plt.ylim(0,1)
+
+# Radiomics vs BMD
+plt.figure()
+plt.plot(ccs0, ccs,'ko')
+plt.xlabel("r2 BMD")
+plt.ylabel("r2 Radiomics")
+plt.axis('square')
+
+plt.plot([0,1],[0,1],'k-')
+
+plt.xlim(0,1)
+plt.ylim(0,1)
 
 #%% Plot Feature Importances
 
