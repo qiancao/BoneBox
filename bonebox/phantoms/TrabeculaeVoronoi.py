@@ -16,6 +16,7 @@ from scipy.spatial import Voronoi, Delaunay
 from itertools import chain # list unpacking
 
 from skimage.draw import line_nd
+import scipy
 from scipy.ndimage import binary_dilation
 
 # import utils
@@ -512,10 +513,46 @@ def drawLine(volume, vertices, edgeVertexInd):
     lin = line_nd(start, end, endpoint = False)
 
     volume[lin] = 1
+    
+def flood_fill_hull(image): 
+    # This is taken from:
+    #   https://stackoverflow.com/questions/46310603/how-to-compute-convex-hull-image-volume-in-3d-numpy-arrays/46314485#46314485
+    # A modified version may be used (TODO: test if this one is faster):
+    #   https://gist.github.com/stuarteberg/8982d8e0419bea308326933860ecce30
+    
+    points = np.transpose(np.where(image))
+    hull = scipy.spatial.ConvexHull(points)
+    deln = scipy.spatial.Delaunay(points[hull.vertices])
+    idx = np.stack(np.indices(image.shape), axis = -1)
+    out_idx = np.nonzero(deln.find_simplex(idx) + 1)
+    out_img = np.zeros(image.shape)
+    out_img[out_idx] = 1
+    
+    return out_img, hull
 
-def drawFace(volume, vertices, faceVertexInd):
-    # Vertices should be in array coordinates (corner origin, unit = voxels)
-    pass
+def drawFace(volume, verticesArray, faceVertexInd):
+    # VerticesArray should be in array coordinates (corner origin, unit = voxels)
+
+    for faceInd in range(len(faceVertexInd)):
+        
+        # Extract face vertices.
+        faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
+        
+        # create a volume with vertices only.
+        volume_verts = np.zeros(volume.shape)
+        
+        # assign faceVerts to volume_verts
+        volume_verts[tuple(np.hsplit(faceVerts,3))] = 1
+        
+        # convex fill        
+        flood_fill_hull(volume_verts)
+        
+        # add hull volume to total volume
+        volume = volume + volume_verts
+        
+    volume = (volume>0).astype(int)
+    
+    return volume
 
 def makeSkeletonVolume(vertices, edgeInds, faceInds, 
                        voxelSize, volumeSizeVoxels):
@@ -543,6 +580,20 @@ def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
     
     for ii in range(edgeInds.shape[0]):
         drawLine(volume, verticesArray, edgeInds[ii,:])
+    
+    return volume
+
+def makeSkeletonVolumeFaces(vertices, faceInds, voxelSize, volumeSizeVoxels):
+    # invoke drawFace
+    # vertices: all vertices from vor.vertices
+    
+    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    
+    # Convert vertices to array-coordinates
+    verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
+    
+    # invoke drawFace
+    drawFace(volume, verticesArray, faceInds)
     
     return volume
 
@@ -601,14 +652,21 @@ if __name__ == "__main__":
                                                                  facesRetainFraction, 
                                                                  randState=randState)
     
-    volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdges, voxelSize, volumeSizeVoxels)
+    volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
     volumeDilated = dilateVolumeSphereUniform(volume, dilationRadius)
     
+    # Testing code for drawFaces
+    faceVertexInd = uniqueFacesRetain
+    vertices = vor.vertices
+    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
+    
+    
     # Visualize all edges
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    for ii in range(edgeVertices.shape[0]):
-        ax.plot(edgeVertices[ii,:,0],edgeVertices[ii,:,1],edgeVertices[ii,:,2],'b-')
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # for ii in range(edgeVertices.shape[0]):
+    #     ax.plot(edgeVertices[ii,:,0],edgeVertices[ii,:,1],edgeVertices[ii,:,2],'b-')
     
     # # Visualize a face
     # face = uniqueFaces[-5]
