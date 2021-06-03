@@ -20,7 +20,7 @@ import trimesh
 # finite element library
 import pychrono as chrono
 import pychrono.fea as fea
-# import pychrono.mkl as mkl
+import pychrono.pardisomkl as mkl
 
 def addPlatten(volume, plattenThicknessVoxels):
     # adds compression plates in Z
@@ -40,7 +40,7 @@ def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size
     # Convert voxel image to surface
     
     if level == None:
-        level = (np.max(volume)+np.min(volume))/2
+        level = (np.max(volume))/2
     
     vertices, faces, normals, values = \
         measure.marching_cubes_lewiner(volume = volume, level = level, spacing = voxelSize, \
@@ -65,7 +65,7 @@ def isWatertight(vertices, faces):
     
 def computeFEACompressLinear(nodes, elements, plateThickness, \
                              elasticModulus=17e9, poissonRatio=0.3, \
-                             force_total = 1):
+                             force_total = 1, solver="ParadisoMKL"):
     # Linear Finite Element Analysis with PyChrono
     # plateThickness: Thickness of compression plates in absolute units
 
@@ -100,36 +100,39 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     
     for ind in faceA_nodeind:
         node_list[ind].SetForce(chrono.ChVectorD(0,0,-force_dist))
-        
+    
+    # Face B: Fixed truss
     truss = chrono.ChBody()
     truss.SetBodyFixed(True)
     system.Add(truss)
     
+    # Face A: Moving truss
     truss_moving = chrono.ChBody()
     system.Add(truss_moving)
     
+    # Add face B nodes to fixed truss
     constr_list = []
     for ind in faceB_nodeind:
         constr_list.append(fea.ChLinkPointFrame())
         constr_list[-1].Initialize(node_list[ind],truss)
         system.Add(constr_list[-1])
     
-    # Create a truss for the moving face
+    # Add face A nodes to moving truss
     constr_list_moving = []
     for ind in faceA_nodeind:
         constr_list_moving.append(fea.ChLinkPointFrame())
         constr_list_moving[-1].Initialize(node_list[ind],truss_moving)
         system.Add(constr_list_moving[-1])
-        
-    # msolver = mkl.ChSolverMKL()
-    # msolver.LockSparsityPattern(True)
-
-    # MINRES solver
-    msolver = chrono.ChSolverMINRES()
-    msolver.SetMaxIterations(100)
-    msolver.SetTolerance(1e-10)
-    msolver.EnableDiagonalPreconditioner(True)
-    msolver.SetVerbose(True)
+    
+    if solver == "ParadisoMKL": # TODO: Validate results from this solver
+        msolver = mkl.ChSolverPardisoMKL()
+        msolver.LockSparsityPattern(True)
+    else: # MINRES solver
+        msolver = chrono.ChSolverMINRES()
+        msolver.SetMaxIterations(100)
+        msolver.SetTolerance(1e-10)
+        msolver.EnableDiagonalPreconditioner(True)
+        msolver.SetVerbose(True)
     
     system.SetSolver(msolver)
     system.DoStaticLinear()
@@ -201,11 +204,24 @@ if __name__ == "__main__":
     plattenThicknessVoxels = 10 # voxels
     plattenThicknessMM = plattenThicknessVoxels * voxelSize[0] # mm
     
+    # Elastic Modulus of a real bone ROI
     roiBone, header = nrrd.read("../../data/rois/isodata_04216_roi_4.nrrd")
-    
     roiBone = addPlatten(roiBone, plattenThicknessVoxels)
     vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05))
     print("Is watertight? " + str(isWatertight(vertices, faces)))
     nodes, elements = Surf2TetMesh(vertices, faces)
-    feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM)
+    feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
     elasticModulus = computeFEAElasticModulus(feaResult)
+    print(elasticModulus)
+    
+    # Elastic Modulus of solid chunk of bone
+    roiCube = np.ones(roiBone.shape).astype(bool)
+    roiCube[0,:,:] = False; roiCube[-1,:,:] = False
+    roiCube[:,0,:] = False; roiCube[:,-1,:] = False
+    roiCube[:,:,0] = False; roiCube[:,:,-1] = False
+    vertices, faces, normals, values = Voxel2SurfMesh(roiCube, voxelSize=(0.05,0.05,0.05))
+    print("Is watertight? " + str(isWatertight(vertices, faces)))
+    nodes, elements = Surf2TetMesh(vertices, faces, verbose=0)
+    feaResult0 = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
+    elasticModulus0 = computeFEAElasticModulus(feaResult0)
+    print(elasticModulus0)
