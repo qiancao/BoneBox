@@ -123,6 +123,18 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         constr_list_moving.append(fea.ChLinkPointFrame())
         constr_list_moving[-1].Initialize(node_list[ind],truss_moving)
         system.Add(constr_list_moving[-1])
+        
+    # Create constraint for face A (allow displacement in Z only)
+    # chrono.ChLinkMateGeneric() didn't seem to work
+    # constr_A = chrono.ChLinkMateGeneric()
+    # constr_A.Initialize(truss_moving, truss, chrono.ChFrameD())
+    # constr_A.SetConstrainedCoords(True, True, False, True, True, True)
+    # system.AddLink(constr_A)
+    
+    # Prismatic Joint, this works for Paradiso MKL solver
+    constr_A = chrono.ChLinkLockPrismatic()
+    constr_A.Initialize(truss, truss_moving, chrono.ChCoordsysD())
+    system.AddLink(constr_A)
     
     if solver == "ParadisoMKL": # TODO: Validate results from this solver
         msolver = mkl.ChSolverPardisoMKL()
@@ -200,28 +212,35 @@ def computeFEAElasticModulus(feaResult):
 
 if __name__ == "__main__":
     
+    import matplotlib.pyplot as plt
+    
     voxelSize = (0.05, 0.05, 0.05) # mm
     plattenThicknessVoxels = 10 # voxels
     plattenThicknessMM = plattenThicknessVoxels * voxelSize[0] # mm
+    cubeShape = (201, 201, 201)
     
     # Elastic Modulus of a real bone ROI
-    roiBone, header = nrrd.read("../../data/rois/isodata_04216_roi_4.nrrd")
-    roiBone = addPlatten(roiBone, plattenThicknessVoxels)
-    vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05))
-    print("Is watertight? " + str(isWatertight(vertices, faces)))
-    nodes, elements = Surf2TetMesh(vertices, faces)
-    feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
-    elasticModulus = computeFEAElasticModulus(feaResult)
-    print(elasticModulus)
+    # roiBone, header = nrrd.read("../../data/rois/isodata_04216_roi_4.nrrd")
+    # roiBone = addPlatten(roiBone, plattenThicknessVoxels)
+    # vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05))
+    # print("Is watertight? " + str(isWatertight(vertices, faces)))
+    # nodes, elements = Surf2TetMesh(vertices, faces)
+    # feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
+    # elasticModulus = computeFEAElasticModulus(feaResult)
+    # print(elasticModulus)
     
     # Elastic Modulus of solid chunk of bone
-    roiCube = np.ones(roiBone.shape).astype(bool)
+    roiCube = np.ones(cubeShape).astype(bool)
     roiCube[0,:,:] = False; roiCube[-1,:,:] = False
     roiCube[:,0,:] = False; roiCube[:,-1,:] = False
     roiCube[:,:,0] = False; roiCube[:,:,-1] = False
     vertices, faces, normals, values = Voxel2SurfMesh(roiCube, voxelSize=(0.05,0.05,0.05))
     print("Is watertight? " + str(isWatertight(vertices, faces)))
     nodes, elements = Surf2TetMesh(vertices, faces, verbose=0)
-    feaResult0 = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
+    feaResult0 = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="ParadisoMKL")
     elasticModulus0 = computeFEAElasticModulus(feaResult0)
     print(elasticModulus0)
+    
+    plt.plot(feaResult0['nodes'][:,1],feaResult0['nodes'][:,2],'ko')
+    plt.plot(feaResult0['nodes'][:,1]+feaResult0['displacement'][:,1]*10e9,
+             feaResult0['nodes'][:,2]+feaResult0['displacement'][:,2]*10e9,'ro')
