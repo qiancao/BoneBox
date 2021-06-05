@@ -25,7 +25,7 @@ print('Running example for TrabeculaeVoronoi')
 def makePhantom(dilationRadius, Nseeds, edgesRetainFraction, randState):
 
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (10,10,10), (Nseeds, Nseeds, Nseeds) # volume extent in XYZ (mm), number of seeds along XYZ
+    Sxyz, Nxyz = (5,5,5), (Nseeds, Nseeds, Nseeds) # volume extent in XYZ (mm), number of seeds along XYZ
     Rxyz = 1.
     # edgesRetainFraction = 0.5
     facesRetainFraction = 0.5
@@ -33,7 +33,7 @@ def makePhantom(dilationRadius, Nseeds, edgesRetainFraction, randState):
     # randState = 123 # for repeatability
     
     # Parameters for generating phantom volume
-    volumeSizeVoxels = (200,200,200)
+    volumeSizeVoxels = (100,100,100)
     voxelSize = np.array(Sxyz) / np.array(volumeSizeVoxels)
     
     # Generate faces and edges
@@ -68,6 +68,8 @@ def makePhantom(dilationRadius, Nseeds, edgesRetainFraction, randState):
     
     edgeVerticesRetain = getEdgeVertices(vor.vertices, uniqueEdgesRetain)
     
+    volumeDilated = setEdgesZero(volumeDilated)
+    
     return volumeDilated, bvtv, edgeVerticesRetain
     
     # Visualize all edges
@@ -82,15 +84,15 @@ rhoBone = 2e-3 # g/mm3
 voxelSize = (0.05, 0.05, 0.05) # mm
 pixelSize = (0.05, 0.05) # mm
 radiusTBS = 5 # pixels
-plattenThicknessVoxels = 10 # voxels
+plattenThicknessVoxels = 5 # voxels
 plattenThicknessMM = plattenThicknessVoxels * voxelSize[0] # mm    
 
 def computeFEA(volume):
 
     roiBone = addPlatten(volume, plattenThicknessVoxels)
-    vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05))
+    vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05), step_size=1)
     print("Is watertight? " + str(isWatertight(vertices, faces)))
-    nodes, elements = Surf2TetMesh(vertices, faces)
+    nodes, elements, tet = Surf2TetMesh(vertices, faces, verbose=0)
     feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM)
     elasticModulus = computeFEAElasticModulus(feaResult)
     
@@ -101,8 +103,8 @@ def computeFEA(volume):
 # Projection/TBS Settings
 dilationRadius = 3.4
 all_randState = [1,2,3]
-all_Nseeds = np.linspace(8,12,3).astype(int)
-all_edgesRetainFraction = np.linspace(0.4,0.5,3)
+all_Nseeds = np.arange(8,21).astype(int)
+all_edgesRetainFraction = np.linspace(0.4,0.6,11)
 
 bvtvs = np.zeros((len(all_randState),len(all_Nseeds),len(all_edgesRetainFraction)))
 Es = np.zeros(bvtvs.shape)
@@ -121,23 +123,26 @@ for rr, randState in enumerate(all_randState):
             
 #%%
 
-# np.save("FEAbvtvs",bvtvs)
-# np.save("FEAEs",Es)
+np.save("FEA_bvtvs", bvtvs)
+np.save("FEA_Es", Es)
 
-plt.imshow(np.mean(bvtvs,axis=0))
-plt.axis("off")
-plt.colorbar()
+# # np.save("FEAbvtvs",bvtvs)
+# # np.save("FEAEs",Es)
 
-plt.imshow(np.std(bvtvs,axis=0))
-plt.axis("off")
-plt.colorbar()
+# plt.imshow(np.mean(bvtvs,axis=0))
+# plt.axis("off")
+# plt.colorbar()
 
-plt.imshow(np.mean(Es,axis=0))
-plt.axis("off")
-plt.colorbar()
+# plt.imshow(np.std(bvtvs,axis=0))
+# plt.axis("off")
+# plt.colorbar()
 
-plt.imshow(np.std(Es,axis=0))
-plt.axis("off")
-plt.colorbar()
+# plt.imshow(np.mean(Es,axis=0))
+# plt.axis("off")
+# plt.colorbar()
 
-plt.plot(bvtvs.flatten(),Es.flatten(),'ko')
+# plt.imshow(np.std(Es,axis=0))
+# plt.axis("off")
+# plt.colorbar()
+
+# plt.plot(bvtvs.flatten(),Es.flatten(),'ko')

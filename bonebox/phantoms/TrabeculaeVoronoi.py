@@ -85,6 +85,14 @@ def Polar2CartesianSphere(r, Theta, Phi):
 def MinMaxNorm(x, xmin, xmax):
     return (x-xmin)/(xmax-xmin)
 
+def setEdgesZero(volume):
+    
+    volume[0,:,:] = 0; volume[-1,:,:] = 0;
+    volume[:,0,:] = 0; volume[:,-1,:] = 0;
+    volume[:,:,0] = 0; volume[:,:,-1] = 0;
+    
+    return volume
+
 #%% Trabecular Phantom
 
 def makeSeedPointsCartesian(Sxyz, Nxyz):

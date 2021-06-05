@@ -16,6 +16,7 @@ import nrrd
 from skimage import measure
 import tetgen
 import trimesh
+import pyvista as pv
 
 # finite element library
 import pychrono as chrono
@@ -24,10 +25,11 @@ import pychrono.pardisomkl as mkl
 
 def addPlatten(volume, plattenThicknessVoxels):
     # adds compression plates in Z
+    # leaves a single-voxel space at the edge of volume (for isosurface)
     
     vmax = np.max(volume)
-    volume[:,:,0:plattenThicknessVoxels] = vmax
-    volume[:,:,-plattenThicknessVoxels:-1] = vmax
+    volume[1:-1,1:-1,1:plattenThicknessVoxels] = vmax
+    volume[1:-1,1:-1,-plattenThicknessVoxels:-1] = vmax
     
     return volume
 
@@ -51,12 +53,12 @@ def Surf2TetMesh(vertices, faces, order=1, verbose=1):
     # Convert surface mesh to tetrahedra
     
     tet = tetgen.TetGen(vertices,faces)
-    tet.tetrahedralize(order=1,verbose=1)
+    tet.tetrahedralize(order=order,verbose=verbose)
     
     nodes = tet.node
     elements = tet.elem
     
-    return nodes, elements
+    return nodes, elements, tet
 
 def isWatertight(vertices, faces):
     # Check if mesh is watertight
@@ -210,37 +212,53 @@ def computeFEAElasticModulus(feaResult):
     
     return force / displacementAinZ
 
+def saveSurfaceMesh(filename, vertices, faces):
+    # Save surface mesh (tested on .STL only)
+    mesh = trimesh.Trimesh(vertices=vertices.copy(), faces=faces.copy())
+    mesh.export(filename)
+
+def saveTetrahedralMesh(filename, tet):
+    pv.save_meshio(filename, tet.grid)
+
 if __name__ == "__main__":
     
     import matplotlib.pyplot as plt
+    import nrrd
     
     voxelSize = (0.05, 0.05, 0.05) # mm
     plattenThicknessVoxels = 10 # voxels
     plattenThicknessMM = plattenThicknessVoxels * voxelSize[0] # mm
     cubeShape = (201, 201, 201)
     
+    filenameNRRD = "../../data/rois/isodata_04216_roi_4.nrrd"
+    filenameSTL = "../../data/output/isodata_04216_roi_4.stl"
+    filenameVTK = "../../data/output/isodata_04216_roi_4.vtk"
+    
     # Elastic Modulus of a real bone ROI
-    # roiBone, header = nrrd.read("../../data/rois/isodata_04216_roi_4.nrrd")
-    # roiBone = addPlatten(roiBone, plattenThicknessVoxels)
-    # vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05))
-    # print("Is watertight? " + str(isWatertight(vertices, faces)))
-    # nodes, elements = Surf2TetMesh(vertices, faces)
-    # feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="MINRES")
-    # elasticModulus = computeFEAElasticModulus(feaResult)
-    # print(elasticModulus)
+    roiBone, header = nrrd.read(filenameNRRD)
+    roiBone = addPlatten(roiBone, plattenThicknessVoxels)
+    vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05), step_size=2)
+    saveSurfaceMesh(filenameSTL, vertices, faces)
+    print("Is watertight? " + str(isWatertight(vertices, faces)))
+    nodes, elements, tet = Surf2TetMesh(vertices, faces, verbose=0)
+    saveTetrahedralMesh(filenameVTK, tet)
+    feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="ParadisoMKL")
+    elasticModulus = computeFEAElasticModulus(feaResult)
+    print(elasticModulus)
     
     # Elastic Modulus of solid chunk of bone
     roiCube = np.ones(cubeShape).astype(bool)
     roiCube[0,:,:] = False; roiCube[-1,:,:] = False
     roiCube[:,0,:] = False; roiCube[:,-1,:] = False
     roiCube[:,:,0] = False; roiCube[:,:,-1] = False
-    vertices, faces, normals, values = Voxel2SurfMesh(roiCube, voxelSize=(0.05,0.05,0.05))
+    vertices, faces, normals, values = Voxel2SurfMesh(roiCube, voxelSize=(0.05,0.05,0.05), step_size=2)
     print("Is watertight? " + str(isWatertight(vertices, faces)))
-    nodes, elements = Surf2TetMesh(vertices, faces, verbose=0)
+    nodes, elements, tet = Surf2TetMesh(vertices, faces, verbose=0)
     feaResult0 = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="ParadisoMKL")
     elasticModulus0 = computeFEAElasticModulus(feaResult0)
     print(elasticModulus0)
     
-    plt.plot(feaResult0['nodes'][:,1],feaResult0['nodes'][:,2],'ko')
-    plt.plot(feaResult0['nodes'][:,1]+feaResult0['displacement'][:,1]*10e9,
-             feaResult0['nodes'][:,2]+feaResult0['displacement'][:,2]*10e9,'ro')
+    f = feaResult
+    plt.plot(f['nodes'][:,1],f['nodes'][:,2],'ko')
+    plt.plot(f['nodes'][:,1]+f['displacement'][:,1]*10e9,
+              f['nodes'][:,2]+f['displacement'][:,2]*10e9,'ro')
