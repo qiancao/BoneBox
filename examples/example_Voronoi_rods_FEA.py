@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 
 from bonebox.FEA.fea import *
 
+#%%
+
 plt.ion()
 
 print('Running example for TrabeculaeVoronoi')
@@ -125,6 +127,11 @@ for rr, randState in enumerate(all_randState):
 
 np.save("FEA_bvtvs", bvtvs)
 np.save("FEA_Es", Es)
+
+#%%
+
+bvtvs = np.load("FEA_bvtvs.npy")
+Es = np.load("FEA_Es.npy")
 
 # # np.save("FEAbvtvs",bvtvs)
 # # np.save("FEAEs",Es)
