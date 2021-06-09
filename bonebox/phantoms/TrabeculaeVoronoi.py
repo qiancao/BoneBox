@@ -540,17 +540,26 @@ def flood_fill_hull(image):
 
 def drawFace(volume, verticesArray, faceVertexInd):
     # VerticesArray should be in array coordinates (corner origin, unit = voxels)
-
+    
+    # radius for expansion along face
+    r = 1.5
+    
     for faceInd in range(len(faceVertexInd)):
         
         # Extract face vertices.
         faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
         
+        # Expand along face normals by radius r
+        faceNorms = computeFaceNormals([faceVerts])[0]
+        faceVertsPos = faceVerts + r*faceNorms
+        faceVertsNeg = faceVerts - r*faceNorms
+        faceVertsAll = np.vstack((faceVertsPos,faceVertsNeg)).astype(int)
+        
         # create a volume with vertices only.
         volume_verts = np.zeros(volume.shape)
         
         # assign faceVerts to volume_verts
-        volume_verts[tuple(np.hsplit(faceVerts,3))] = 1
+        volume_verts[tuple(np.hsplit(faceVertsAll,3))] = 1
         
         # convex fill        
         flood_fill_hull(volume_verts)
@@ -660,8 +669,10 @@ if __name__ == "__main__":
                                                                  facesRetainFraction, 
                                                                  randState=randState)
     
-    volume = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
-    volumeDilated = dilateVolumeSphereUniform(volume, dilationRadius)
+    volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
+    # volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
+    # volumeDilated = dilateVolumeSphereUniform(np.logical_and(volumeEdges,volumeFaces), dilationRadius)
+    volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
     
     # Testing code for drawFaces
     faceVertexInd = uniqueFacesRetain

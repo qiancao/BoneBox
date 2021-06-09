@@ -100,8 +100,6 @@ def computeFEA(volume):
     
     return elasticModulus
 
-#%%
-
 # Projection/TBS Settings
 dilationRadius = 3.4
 all_randState = [1,2,3]
@@ -110,6 +108,9 @@ all_edgesRetainFraction = np.linspace(0.4,0.6,11)
 
 bvtvs = np.zeros((len(all_randState),len(all_Nseeds),len(all_edgesRetainFraction)))
 Es = np.zeros(bvtvs.shape)
+
+
+#%%
 
 for rr, randState in enumerate(all_randState):
     for nn, Nseeds in enumerate(all_Nseeds):
@@ -132,6 +133,21 @@ np.save("FEA_Es", Es)
 
 bvtvs = np.load("FEA_bvtvs.npy")
 Es = np.load("FEA_Es.npy")
+
+extent=[np.min(all_edgesRetainFraction),np.max(all_edgesRetainFraction),
+        np.min(all_Nseeds),np.max(all_Nseeds)]
+
+plt.imshow(np.mean(bvtvs,axis=0), extent=extent, aspect='auto')
+plt.xlabel("% Retained Edges")
+plt.ylabel("Number of Seed Points")
+
+plt.imshow(np.flip(np.mean(Es,axis=0),axis=1), cmap = "plasma", extent=extent, aspect='auto')
+plt.xlabel("% Retained Edges")
+plt.ylabel("Number of Seed Points")
+
+plt.plot(bvtvs.flatten(), -Es.flatten(),'ko')
+plt.xlabel("BvTv")
+plt.ylabel("Elastic Modulus")
 
 # # np.save("FEAbvtvs",bvtvs)
 # # np.save("FEAEs",Es)
