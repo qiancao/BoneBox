@@ -254,8 +254,6 @@ plt.grid()
 
 #%%
 
-
-
 # EsArray = np.array(EsList)
 
 # bvtvs = np.load(out_dir+"FEA_bvtvs_2.npy")
