@@ -240,52 +240,201 @@ plt.axis("off")
 plt.savefig(out_dir+'PhantomX_20210623.png',bbox_inches = 'tight',
     pad_inches = 0)
 
-#%% Shuffle - Load File
+#%% Shuffle - Load File and Compute Radiomics
 
 phanHU = np.load(out_dir+"PhantomX_20210623.npy")
+            
+#%% Radiomics Extraction Pipeline to be incorporated into BoneBox.metrics.radiomics.py
 
-phanHU = np.delete(phanHU,obj=np.arange(3171,3188),axis=0)
+from __future__ import print_function
+import logging
+import SimpleITK as sitk
 
-#%% Shuffle - Roll Matrix Positions
+import radiomics
+from radiomics import featureextractor
 
-for rr, randState in enumerate(randStates):
+# Define settings for signature calculation
+# These are currently set equal to the respective default values
+settings = {}
+settings['binWidth'] = 25
+settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
+settings['interpolator'] = sitk.sitkBSpline
+
+# Initialize feature extractor
+extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
+extractor.enableFeatureClassByName("glcm")
+
+# Test Image
+ii = 0; pp = 0; rr = 0
+xind = (ii*7+pp)*(dimX // phantomsInX)
+yind = rr*(dimY // phantomsInY)
+
+volume = phanHU[xind:xind+100,yind:yind+100,:]
+volumeSITK = sitk.GetImageFromArray(volume)
+maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
+
+featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
+
+phanFeatures = np.zeros((21,14,len(featureVector)))
+featureNames = featureVector.keys()
+
+for ii, isoval in enumerate(isobvtv_vals): # 3
     
-    yind = rr*(dimY // phantomsInY)
+    dilationRadiusArray = isobvtv_xyeval[ii][:,0]
+    NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
     
-    phanHU[:,yind:yind+100,:] = np.roll(phanHU[:,yind:yind+100,:], shift=rr*7*(dimX // phantomsInX), axis=0)
-    
-np.save(out_dir+"PhantomX_20210623_shuffle.npy", phanHU)
-
-#%% save shuffled image
-
-import matplotlib.pyplot as plt
-import numpy as np
-plt.imshow(phanHU[:,:,50].T,cmap="gray")
-plt.axis("off")
-plt.savefig(out_dir+'PhantomX_20210623_shuffle.png',bbox_inches = 'tight',
-    pad_inches = 0)
+    for pp in range(samplesPerVal): # 7
+        
+        for rr, randState in enumerate(randStates): # 14
+            
+            print(ii, pp, rr)
+            
+            xind = (ii*7+pp)*(dimX // phantomsInX)
+            yind = rr*(dimY // phantomsInY)
+            
+            volume = phanHU[xind:xind+100,yind:yind+100,:]
+            
+            volumeSITK = sitk.GetImageFromArray(volume)
+            maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
+            
+            featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
+            
+            phanFeatures[ii*7+pp,rr] = [featureVector[featureName].item() for featureName in featureVector.keys()]
+            
+np.save(out_dir+"PhantomX_20210623_features", phanFeatures)
 
 #%%
 
-from PIL import Image
+import matplotlib.pyplot as plt
 import numpy as np
 
-data = phanHU[:,:,50]
+for fnind, fn in enumerate(featureNames):
 
-data[data==1500] = 255
-data[data==-50] = 50
-data[data==-800] = 0
+    plt.figure()
+    ax = plt.axes([0, 0.05, 0.9, 0.9 ])
+    im = ax.imshow(phanFeatures[:,:,fnind].T,cmap="plasma")
+    plt.axis("off")
+    plt.title(fn)
+    # cax = plt.axes([0.95, 0.05, 0.05,0.9 ])
+    plt.colorbar(mappable=im)
+    # plt.savefig(out_dir+'features/'+fn+".png", bbox_inches = 'tight',
+    #     pad_inches = 0)
+    plt.savefig(out_dir+'features/'+fn+".png", bbox_inches = 'tight')
+    
+    plt.close("all")
+    
+#%%
 
-data = data.astype(np.uint8)
+phanFeaturesGLCM = phanFeatures[:,:,np.where(["original_glcm" in fn for fn in featureNames])[0]]
+featureNamesGLCM = [fn for fn in featureNames if ("original_glcm" in fn)]
+# phanFeaturesFO = phanFeatures[:,:,np.where(["original_firstorder" in fn for fn in featureNames])[0]]
 
-#Rescale to 0-255 and convert to uint8
-# rescaled = (255.0 / data.max() * (data - (data.min()))).astype(np.uint8)
+bvtvVal = np.zeros(phanFeaturesGLCM.shape)
+radiusVal = np.zeros(phanFeaturesGLCM.shape)
+NseedsVal = np.zeros(phanFeaturesGLCM.shape)
 
-im = Image.fromarray(rescaled)
-im.save(out_dir+'PhantomX_20210623.png')
+for ii, isoval in enumerate(isobvtv_vals): # 3
+    
+    dilationRadiusArray = isobvtv_xyeval[ii][:,0]
+    NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
+    
+    for pp in range(samplesPerVal): # 7
+        
+        for rr, randState in enumerate(randStates): # 14
+            
+            xind = ii*7+pp
+            yind = rr
+            
+            bvtvVal[xind, yind,:] = isoval
+            radiusVal[xind,yind,:] = dilationRadiusArray[pp]
+            NseedsVal[xind,yind,:] = NseedsArray[pp]
 
-# for xx in range(phantomsInX):
-#     for yy in range(phantomsInY):
+fig = plt.figure()
+for ff, fn in enumerate(featureNamesGLCM):
+    
+    f = phanFeaturesGLCM[:,:,ff].flatten()
+    b = bvtvVal[:,:,ff].flatten()
+    r = radiusVal[:,:,ff].flatten()
+    n = NseedsVal[:,:,ff].flatten()
+    
+    mfit, bfit = np.polyfit(r, f, 1)
+    r2 = np.corrcoef(r,f)[0,1]**2
+
+    plt.subplot(4,6,ff+1)
+    plt.plot(r, f, 'ko')
+    plt.plot(r, mfit*r + bfit, "b--")
+    plt.title("r2="+str(r2),size=8)
+    # plt.xlabel("R",size=8)
+    plt.ylabel(fn,size=8)
+    
+fig.tight_layout(pad=5)
+
+fig = plt.figure()
+for ff, fn in enumerate(featureNamesGLCM):
+    
+    f = phanFeaturesGLCM[:,:,ff].flatten()
+    b = bvtvVal[:,:,ff].flatten()
+    r = radiusVal[:,:,ff].flatten()
+    n = NseedsVal[:,:,ff].flatten()
+    
+    mfit, bfit = np.polyfit(n, f, 1)
+    r2 = np.corrcoef(n,f)[0,1]**2
+
+    plt.subplot(4,6,ff+1)
+    plt.plot(n, f, 'ko')
+    plt.plot(n, mfit*n + bfit, "b--")
+    plt.title("r2="+str(r2),size=8)
+    # plt.xlabel("R",size=8)
+    plt.ylabel(fn,size=8)
+    
+fig.tight_layout(pad=3)
+    
+    
+    
+    
+
+# phanHU = np.delete(phanHU,obj=np.arange(3171,3188),axis=0)
+
+# #%% Shuffle - Roll Matrix Positions
+
+# for rr, randState in enumerate(randStates):
+    
+#     yind = rr*(dimY // phantomsInY)
+    
+#     phanHU[:,yind:yind+100,:] = np.roll(phanHU[:,yind:yind+100,:], shift=rr*7*(dimX // phantomsInX), axis=0)
+    
+# np.save(out_dir+"PhantomX_20210623_shuffle.npy", phanHU)
+
+# #%% save shuffled image
+
+# import matplotlib.pyplot as plt
+# import numpy as np
+# plt.imshow(phanHU[:,:,50].T,cmap="gray")
+# plt.axis("off")
+# plt.savefig(out_dir+'PhantomX_20210623_shuffle.png', bbox_inches = 'tight',
+#     pad_inches = 0)
+
+# #%%
+
+# from PIL import Image
+# import numpy as np
+
+# data = phanHU[:,:,50]
+
+# data[data==1500] = 255
+# data[data==-50] = 50
+# data[data==-800] = 0
+
+# data = data.astype(np.uint8)
+
+# #Rescale to 0-255 and convert to uint8
+# # rescaled = (255.0 / data.max() * (data - (data.min()))).astype(np.uint8)
+
+# im = Image.fromarray(rescaled)
+# im.save(out_dir+'PhantomX_20210623.png')
+
+# # for xx in range(phantomsInX):
+# #     for yy in range(phantomsInY):
 
 #%%
 
