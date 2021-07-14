@@ -558,6 +558,9 @@ def drawFace(volume, verticesArray, faceVertexInd):
         # create a volume with vertices only.
         volume_verts = np.zeros(volume.shape)
         
+        # Need to debug this
+        print(faceInd)
+        
         # assign faceVerts to volume_verts
         volume_verts[tuple(np.hsplit(faceVertsAll,3))] = 1
         
@@ -670,7 +673,7 @@ if __name__ == "__main__":
                                                                  randState=randState)
     
     volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
-    # volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
+    volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
     # volumeDilated = dilateVolumeSphereUniform(np.logical_and(volumeEdges,volumeFaces), dilationRadius)
     volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
     

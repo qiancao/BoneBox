@@ -71,14 +71,6 @@ def makePhantom(dilationRadius, Nseeds, edgesRetainFraction, randState):
     volumeDilated = setEdgesZero(volumeDilated)
     
     return volumeDilated, bvtv, edgeVerticesRetain
-    
-    # Visualize all edges
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111, projection='3d')
-    # for ii in range(edgeVertices.shape[0]):
-    #     ax.plot(edgeVertices[ii,:,0],edgeVertices[ii,:,1],edgeVertices[ii,:,2],'b-')
-    
-    # volumeSmoothed = mcubes.smooth(volumeDilated)
 
 rhoBone = 2e-3 # g/mm3
 voxelSize = (0.05, 0.05, 0.05) # mm
@@ -183,7 +175,7 @@ phanHU = np.ones((dimX,dimY,dimZ))*(-800)
 
 randStates = np.arange(14)
 
-#%%
+#%% Skip: Generate Phantoms
 
 for ii, isoval in enumerate(isobvtv_vals): # 3
     
@@ -211,27 +203,9 @@ for ii, isoval in enumerate(isobvtv_vals): # 3
             # Assign to phanHU
             phanHU[xind:xind+100,yind:yind+100,:] = volume
             
-            # np.save(phantoms_iso_dir+"phan_"+str(ii)+"_"+str(pp)+"_"+str(rr), volume)
-            # plt.subplot(1, 3, 1)
-            # plt.imshow(volume[:,:,50],interpolation="nearest",cmap="gray")
-            # plt.title("XY"); plt.axis("off")
-            # plt.subplot(1, 3, 2)
-            # plt.imshow(volume[:,50,:],interpolation="nearest",cmap="gray")
-            # plt.title("XZ"); plt.axis("off")
-            # plt.subplot(1, 3, 3)
-            # plt.imshow(volume[50,:,:],interpolation="nearest",cmap="gray")
-            # plt.title("YZ"); plt.axis("off")
-            # plt.savefig(phantoms_iso_dir+"fig_"+str(ii)+"_"+str(pp)+"_"+str(rr))
-            # plt.close("all")
-            
-            # E = computeFEA(volume)
-            # EsArr[ii,pp,rr] = E
-            
-            # print(E)
-            
 np.save(out_dir+"PhantomX_20210623", phanHU)
 
-#%%
+#%
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -278,6 +252,8 @@ featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="o
 phanFeatures = np.zeros((21,14,len(featureVector)))
 featureNames = featureVector.keys()
 
+#%% Skip
+
 for ii, isoval in enumerate(isobvtv_vals): # 3
     
     dilationRadiusArray = isobvtv_xyeval[ii][:,0]
@@ -305,6 +281,10 @@ np.save(out_dir+"PhantomX_20210623_features", phanFeatures)
 
 #%%
 
+phanFeatures = np.load(out_dir+"PhantomX_20210623_features.npy")
+
+#%% Skip
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -323,75 +303,148 @@ for fnind, fn in enumerate(featureNames):
     
     plt.close("all")
     
+#%% Some useful utilities
+
+def getFeaturesContaining(featureString):
+    """
+    Get Features from phanFeatures and featureNames Containing A Specific Substring
+    
+    phanFeatures
+    featureNames
+    isobvtv_xyeval
+    
+    """
+    
+    pf = phanFeatures[:,:,np.where([featureString in fn for fn in featureNames])[0]]
+    fn = [fn for fn in featureNames if (featureString in fn)]
+    
+    bvtv = np.zeros(pf.shape)
+    radius = np.zeros(pf.shape)
+    Nseeds = np.zeros(pf.shape)
+    
+    for ii, isoval in enumerate(isobvtv_vals): # 3
+        
+        dilationRadiusArray = isobvtv_xyeval[ii][:,0]
+        NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
+        
+        for pp in range(samplesPerVal): # 7
+            
+            for rr, randState in enumerate(randStates): # 14
+                
+                xind = ii*samplesPerVal+pp
+                yind = rr
+                
+                bvtv[xind, yind,:] = isoval
+                radius[xind,yind,:] = dilationRadiusArray[pp]
+                Nseeds[xind,yind,:] = NseedsArray[pp]
+    
+    return pf, fn, bvtv, radius, Nseeds
+
+def plotFeaturesVsRadius(features, nrows, ncols):
+    fig = plt.figure()
+    for ff, fn in enumerate(features[1]):
+        
+        f = features[0][:,:,ff].flatten()
+        b = features[2][:,:,ff].flatten()
+        r = features[3][:,:,ff].flatten()
+        n = features[4][:,:,ff].flatten()
+        
+        mfit, bfit = np.polyfit(r, f, 1)
+        r2 = np.corrcoef(r,f)[0,1]**2
+    
+        plt.subplot(nrows, ncols, ff+1)
+        plt.plot(r, f, 'ko', markersize=2)
+        plt.plot(r, mfit*r + bfit, "b--")
+        plt.title("r2="+"{:.3f}".format(r2),size=8)
+        plt.ylabel(fn,size=8)
+        
+    fig.subplots_adjust(hspace=.35, wspace=.45)
+    
+    return fig
+    
+def plotFeaturesVsNseeds(features, nrows, ncols):
+    fig = plt.figure()
+    for ff, fn in enumerate(features[1]):
+        
+        f = features[0][:,:,ff].flatten()
+        b = features[2][:,:,ff].flatten()
+        r = features[3][:,:,ff].flatten()
+        n = features[4][:,:,ff].flatten()
+        
+        mfit, bfit = np.polyfit(n, f, 1)
+        r2 = np.corrcoef(n, f)[0,1]**2
+    
+        plt.subplot(nrows, ncols, ff+1)
+        plt.plot(n, f, 'ko', markersize=2)
+        plt.plot(n, mfit*n + bfit, "b--")
+        plt.title("r2="+"{:.3f}".format(r2),size=8)
+        plt.ylabel(fn,size=8)
+        
+    fig.subplots_adjust(hspace=.35, wspace=.45)
+    
+    return fig
+    
 #%%
 
-phanFeaturesGLCM = phanFeatures[:,:,np.where(["original_glcm" in fn for fn in featureNames])[0]]
-featureNamesGLCM = [fn for fn in featureNames if ("original_glcm" in fn)]
-# phanFeaturesFO = phanFeatures[:,:,np.where(["original_firstorder" in fn for fn in featureNames])[0]]
+featuresFO = getFeaturesContaining("original_firstorder")
+featuresGLCM = getFeaturesContaining("original_glcm")
+featuresGLDM = getFeaturesContaining("original_gldm")
+featuresGLRLM = getFeaturesContaining("original_glrlm")
 
-bvtvVal = np.zeros(phanFeaturesGLCM.shape)
-radiusVal = np.zeros(phanFeaturesGLCM.shape)
-NseedsVal = np.zeros(phanFeaturesGLCM.shape)
+fig = plotFeaturesVsRadius(featuresGLCM, 4, 6)
+fig = plotFeaturesVsNseeds(featuresGLCM, 4, 6)
 
-for ii, isoval in enumerate(isobvtv_vals): # 3
-    
-    dilationRadiusArray = isobvtv_xyeval[ii][:,0]
-    NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
-    
-    for pp in range(samplesPerVal): # 7
-        
-        for rr, randState in enumerate(randStates): # 14
-            
-            xind = ii*7+pp
-            yind = rr
-            
-            bvtvVal[xind, yind,:] = isoval
-            radiusVal[xind,yind,:] = dilationRadiusArray[pp]
-            NseedsVal[xind,yind,:] = NseedsArray[pp]
+fig = plotFeaturesVsRadius(featuresGLDM, 4, 6)
+fig = plotFeaturesVsNseeds(featuresGLDM, 4, 6)
 
-fig = plt.figure()
-for ff, fn in enumerate(featureNamesGLCM):
-    
-    f = phanFeaturesGLCM[:,:,ff].flatten()
-    b = bvtvVal[:,:,ff].flatten()
-    r = radiusVal[:,:,ff].flatten()
-    n = NseedsVal[:,:,ff].flatten()
-    
-    mfit, bfit = np.polyfit(r, f, 1)
-    r2 = np.corrcoef(r,f)[0,1]**2
+fig = plotFeaturesVsRadius(featuresGLRLM, 4, 6)
+fig = plotFeaturesVsNseeds(featuresGLRLM, 4, 6)
 
-    plt.subplot(4,6,ff+1)
-    plt.plot(r, f, 'ko')
-    plt.plot(r, mfit*r + bfit, "b--")
-    plt.title("r2="+str(r2),size=8)
-    # plt.xlabel("R",size=8)
-    plt.ylabel(fn,size=8)
-    
-fig.tight_layout(pad=5)
+#%%
 
-fig = plt.figure()
-for ff, fn in enumerate(featureNamesGLCM):
-    
-    f = phanFeaturesGLCM[:,:,ff].flatten()
-    b = bvtvVal[:,:,ff].flatten()
-    r = radiusVal[:,:,ff].flatten()
-    n = NseedsVal[:,:,ff].flatten()
-    
-    mfit, bfit = np.polyfit(n, f, 1)
-    r2 = np.corrcoef(n,f)[0,1]**2
 
-    plt.subplot(4,6,ff+1)
-    plt.plot(n, f, 'ko')
-    plt.plot(n, mfit*n + bfit, "b--")
-    plt.title("r2="+str(r2),size=8)
-    # plt.xlabel("R",size=8)
-    plt.ylabel(fn,size=8)
+
+#%% Correlation Feature Value vs Density
+# fig = plt.figure()
+# for ff, fn in enumerate(featureNamesGLCM):
     
-fig.tight_layout(pad=3)
+#     f = phanFeaturesGLCM[:,:,ff].flatten()
+#     b = bvtvVal[:,:,ff].flatten()
+#     r = radiusVal[:,:,ff].flatten()
+#     n = NseedsVal[:,:,ff].flatten()
     
+#     mfit, bfit = np.polyfit(n, f, 1)
+#     r2 = np.corrcoef(n,f)[0,1]**2
+
+#     plt.subplot(4,6,ff+1)
+#     plt.plot(n, f, 'ko', markersize=2)
+#     plt.plot(n, mfit*n + bfit, "b--")
+#     plt.title("r2="+"{:.3f}".format(r2),size=8)
+#     # plt.xlabel("R",size=8)
+#     plt.ylabel(fn,size=8)
     
+# fig.subplots_adjust(hspace=.35, wspace=.45)
+
+#%% Correlation Feature Value vs Radius
+# fig = plt.figure()
+# for ff, fn in enumerate(featureNamesGLCM):
     
+#     f = phanFeaturesGLCM[:,:,ff].flatten()
+#     b = bvtvVal[:,:,ff].flatten()
+#     r = radiusVal[:,:,ff].flatten()
+#     n = NseedsVal[:,:,ff].flatten()
     
+#     mfit, bfit = np.polyfit(r, f, 1)
+#     r2 = np.corrcoef(r,f)[0,1]**2
+
+#     plt.subplot(4,6,ff+1)
+#     plt.plot(r, f, 'ko', markersize=2)
+#     plt.plot(r, mfit*r + bfit, "b--")
+#     plt.title("r2="+"{:.3f}".format(r2),size=8)
+#     # plt.xlabel("R",size=8)
+#     plt.ylabel(fn,size=8)
+    
+# fig.subplots_adjust(hspace=.35, wspace=.45)
 
 # phanHU = np.delete(phanHU,obj=np.arange(3171,3188),axis=0)
 

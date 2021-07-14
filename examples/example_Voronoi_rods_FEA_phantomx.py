@@ -256,6 +256,33 @@ for rr, randState in enumerate(randStates):
     
 np.save(out_dir+"PhantomX_20210623_shuffle.npy", phanHU)
 
+#%% Condense into smaller "batches"
+
+phanHUsh = np.load(out_dir+"PhantomX_20210623_shuffle.npy")
+
+xinds = []
+yinds = []
+
+for ii, isoval in enumerate(isobvtv_vals): # 3
+    
+    for pp in range(samplesPerVal): # 7
+        
+        for rr, randState in enumerate(randStates): # 14
+            
+            print(ii, pp, rr)
+            
+            xind = (ii*7+pp)*(dimX // phantomsInX)
+            yind = rr*(dimY // phantomsInY)
+            
+            xinds.append(xind)
+            yinds.append(yind)
+            
+yinds = np.array(yinds)[:14]
+xinds = np.array(xinds)
+
+
+
+
 #%% save shuffled image
 
 import matplotlib.pyplot as plt
