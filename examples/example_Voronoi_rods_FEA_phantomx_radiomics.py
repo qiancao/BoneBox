@@ -8,6 +8,8 @@ Generate a series of Voronoi Rod (AND PLATE) phantoms
 
 """
 
+from __future__ import print_function
+
 import sys
 sys.path.append('../') # use bonebox from source without having to install/build
 
@@ -175,52 +177,51 @@ phanHU = np.ones((dimX,dimY,dimZ))*(-800)
 
 randStates = np.arange(14)
 
-#%% Skip: Generate Phantoms
+#% Skip: Generate Phantoms
 
-for ii, isoval in enumerate(isobvtv_vals): # 3
+# for ii, isoval in enumerate(isobvtv_vals): # 3
     
-    dilationRadiusArray = isobvtv_xyeval[ii][:,0]
-    NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
+#     dilationRadiusArray = isobvtv_xyeval[ii][:,0]
+#     NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
     
-    for pp in range(samplesPerVal): # 7
+#     for pp in range(samplesPerVal): # 7
         
-        for rr, randState in enumerate(randStates): # 14
+#         for rr, randState in enumerate(randStates): # 14
             
-            print(ii, pp, rr)
+#             print(ii, pp, rr)
             
-            xind = (ii*7+pp)*(dimX // phantomsInX)
-            yind = rr*(dimY // phantomsInY)
+#             xind = (ii*7+pp)*(dimX // phantomsInX)
+#             yind = rr*(dimY // phantomsInY)
             
-            volume, bvtv, edgeVerticesRetain = makePhantom(dilationRadiusArray[pp],
-                                                            NseedsArray[pp],
-                                                            edgesRetainFraction,
-                                                            randState)
+#             volume, bvtv, edgeVerticesRetain = makePhantom(dilationRadiusArray[pp],
+#                                                             NseedsArray[pp],
+#                                                             edgesRetainFraction,
+#                                                             randState)
             
-            # Convert to HU
-            volume[volume==1] = HUBone
-            volume[volume==0] = HUMarrow
+#             # Convert to HU
+#             volume[volume==1] = HUBone
+#             volume[volume==0] = HUMarrow
             
-            # Assign to phanHU
-            phanHU[xind:xind+100,yind:yind+100,:] = volume
+#             # Assign to phanHU
+#             phanHU[xind:xind+100,yind:yind+100,:] = volume
             
-np.save(out_dir+"PhantomX_20210623", phanHU)
+# np.save(out_dir+"PhantomX_20210623", phanHU)
 
-#%
+# #%
 
-import matplotlib.pyplot as plt
-import numpy as np
-plt.imshow(phanHU[:,:,50].T,cmap="gray")
-plt.axis("off")
-plt.savefig(out_dir+'PhantomX_20210623.png',bbox_inches = 'tight',
-    pad_inches = 0)
+# import matplotlib.pyplot as plt
+# import numpy as np
+# plt.imshow(phanHU[:,:,50].T,cmap="gray")
+# plt.axis("off")
+# plt.savefig(out_dir+'PhantomX_20210623.png',bbox_inches = 'tight',
+#     pad_inches = 0)
 
-#%% Shuffle - Load File and Compute Radiomics
+#% Shuffle - Load File and Compute Radiomics
 
 phanHU = np.load(out_dir+"PhantomX_20210623.npy")
             
 #%% Radiomics Extraction Pipeline to be incorporated into BoneBox.metrics.radiomics.py
 
-from __future__ import print_function
 import logging
 import SimpleITK as sitk
 
@@ -291,7 +292,7 @@ import numpy as np
 for fnind, fn in enumerate(featureNames):
 
     plt.figure()
-    ax = plt.axes([0, 0.05, 0.9, 0.9 ])
+    ax = plt.axes([0, 0.05, 0.9, 0.9])
     im = ax.imshow(phanFeatures[:,:,fnind].T,cmap="plasma")
     plt.axis("off")
     plt.title(fn)
@@ -400,9 +401,237 @@ fig = plotFeaturesVsNseeds(featuresGLDM, 4, 6)
 fig = plotFeaturesVsRadius(featuresGLRLM, 4, 6)
 fig = plotFeaturesVsNseeds(featuresGLRLM, 4, 6)
 
+#%% Mechanical strength
+
+# Transposed with original phantom
+phanHUgrid = np.zeros((100,100,100,len(randStates),samplesPerVal*len(isobvtv_vals)))
+
+for ii, isoval in enumerate(isobvtv_vals): # 3
+    
+    dilationRadiusArray = isobvtv_xyeval[ii][:,0]
+    NseedsArray = isobvtv_xyeval[ii][:,1].astype(int)
+    
+    for pp in range(samplesPerVal): # 7
+        
+        for rr, randState in enumerate(randStates): # 14
+            
+            print(ii, pp, rr)
+            
+            xind = (ii*7+pp)*(dimX // phantomsInX)
+            yind = rr*(dimY // phantomsInY)
+            
+            # Note: The grid here is transposed
+            yind_volumes = ii*7+pp # 0 to 20
+            xind_volumes = rr # 0 to 13
+            
+            volume = phanHU[xind:xind+100,yind:yind+100,:]
+            
+            phanHUgrid[:,:,:,xind_volumes,yind_volumes] = volume
+            
+#%% FEA
+
+import sys
+sys.path.append('../') # use bonebox from source without having to install/build
+
+from bonebox.phantoms.TrabeculaeVoronoi import *
+import numpy as np
+import matplotlib.pyplot as plt
+# import mcubes
+from bonebox.FEA.fea import *
+
+rhoBone = 2e-3 # g/mm3
+voxelSize = (0.05, 0.05, 0.05) # mm
+pixelSize = (0.05, 0.05) # mm
+radiusTBS = 5 # pixels
+plattenThicknessVoxels = 5 # voxels
+plattenThicknessMM = plattenThicknessVoxels * voxelSize[0] # mm    
+
+def computeFEA(volume):
+
+    roiBone = addPlatten(volume, plattenThicknessVoxels)
+    vertices, faces, normals, values = Voxel2SurfMesh(roiBone, voxelSize=(0.05,0.05,0.05), step_size=1)
+    print("Is watertight? " + str(isWatertight(vertices, faces)))
+    nodes, elements, tet = Surf2TetMesh(vertices, faces, verbose=0)
+    feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM)
+    elasticModulus = computeFEAElasticModulus(feaResult)
+    
+    return elasticModulus
+
+phanStiffness = np.zeros((len(randStates),samplesPerVal*len(isobvtv_vals)))
+
+for xx in range(14):
+    for yy in range(21):
+        print(xx,yy)
+        E = computeFEA(phanHUgrid[:,:,:,xx,yy])
+        phanStiffness[xx,yy] = E
+        
+np.save(out_dir+"PhantomX_20210623_stiffness", phanStiffness)
+
 #%%
 
+phanStiffness = np.load(out_dir+"PhantomX_20210623_stiffness.npy") # so far only the first 4 rows
 
+#%% Correlate stiffness with features
+
+pstiffness = -phanStiffness.T[:,:4].reshape(84)
+pfeatures = phanFeatures[:,:4,:].reshape(84,93)
+featureNames = list(featureNames)
+
+radiomics_dir = "/data/BoneBox-out/radiomics vs stiffness/"
+
+pr2 = np.zeros(93)
+
+for ii in range(93):
+    
+    mfit, bfit = np.polyfit(pfeatures[:,ii],pstiffness, 1)
+    pr2[ii] = np.corrcoef(pfeatures[:,ii],pstiffness)[0,1]**2
+    
+    plt.figure(figsize=(4,3))
+    plt.plot(pfeatures[:,ii],pstiffness,'k.')
+    plt.title(featureNames[ii]+" r2="+"{:.3f}".format(pr2[ii]))
+    plt.plot(pfeatures[:,ii], mfit*pfeatures[:,ii] + bfit, "b--")
+    plt.xlabel("Feature Value")
+    plt.ylabel("Stiffness")
+    
+    plt.savefig(radiomics_dir+str(ii)+"_"+featureNames[ii]+"_"+"{:.3f}".format(pr2[ii])+".png")
+    plt.close("all")
+
+pr2[np.isnan(pr2)]=0
+pr2sind = np.argsort(pr2)[::-1]
+    
+fig, ax = plt.subplots()
+ax.barh(np.arange(93),width=pr2[pr2sind[:93]])
+ax.set_yticks(np.arange(93))
+ax.set_yticklabels([featureNames[ii] for ii in pr2sind[:93]])
+ax.invert_yaxis()
+plt.tight_layout()
+
+#%% Heatmap
+
+import seaborn as sns
+import pandas as pd
+
+sns.set(font_scale=0.4)
+
+d = pd.DataFrame(data=pfeatures,
+                 columns=featureNames)
+corr = d.corr()
+mask = np.triu(np.ones_like(corr, dtype=np.bool))
+f, ax = plt.subplots(figsize=(11, 9))
+cmap = sns.diverging_palette(220, 10, as_cmap=True)
+g = sns.heatmap(corr, mask=mask, cmap=cmap, vmin=-1., vmax=1.,
+            square=True, linewidths=.5, cbar_kws={"shrink": .5},annot_kws={"size": 3})
+
+#%% 
+
+features_norm = pfeatures.copy()
+features_norm -= np.mean(pfeatures,axis=0) # center on mean
+features_norm /= np.std(pfeatures,axis=0) # scale to standard deviation
+
+features_norm[np.isnan(features_norm)] = 0
+
+#%% Random Forest Grid Search using 5-fold cross validation
+
+roi_vm_mean = pstiffness
+
+plt.close('all')
+
+import random
+
+random.seed(1234)
+
+# non-linear without feature selection
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import GridSearchCV
+
+param_grid = [
+        {'max_depth': [2,4,8,16,32,64,128,256], # 16
+        'max_leaf_nodes': [2,4,8,16,32,64,128,256], # 8
+        'n_estimators': [10,50,100,150,200]} # 50
+            ]
+
+rfr = GridSearchCV(
+        RandomForestRegressor(), 
+        param_grid, cv = 5,
+        scoring = 'explained_variance',
+        n_jobs=-1
+        )
+
+grid_result = rfr.fit(features_norm, roi_vm_mean)
+yTrain_fit_rfr = rfr.predict(features_norm)
+
+rfr_params = {'max_depth': rfr.best_estimator_.max_depth,
+              'max_leaf_nodes': rfr.best_estimator_.max_leaf_nodes,
+              'n_estimators': rfr.best_estimator_.n_estimators}
+
+rfr_params = {'max_depth': 64,
+              'max_leaf_nodes': 128,
+              'n_estimators': 150}
+
+print(rfr_params)
+
+sns.set(font_scale=1)
+
+mfit, bfit = np.polyfit(roi_vm_mean, yTrain_fit_rfr, 1)
+pr2 = np.corrcoef(roi_vm_mean, yTrain_fit_rfr)[0,1]**2
+
+plt.figure()
+plt.plot(roi_vm_mean,yTrain_fit_rfr,'ko')
+plt.plot(roi_vm_mean, mfit*roi_vm_mean + bfit, "b--")
+
+# Plot feature importance
+
+importances = rfr.best_estimator_.feature_importances_
+indices = np.argsort(importances)[::-1]
+std = np.std([tree.feature_importances_ for tree in rfr.best_estimator_], axis = 0)
+plt.figure()
+plt.title('Feature importances')
+plt.barh(range(20), importances[indices[0:20]], yerr = std[indices[0:20]], align = 'center',log=True)
+plt.yticks(range(20), list(featureNames[i] for i in indices[0:20] ), rotation=0)
+plt.gca().invert_yaxis()
+plt.show()
+
+plt.subplots_adjust(left=0.7,bottom=0.1, right=0.8, top=0.9)
+
+# print('Leading features:', feature_names[indices[0:5]])
+
+#%% Half-split
+
+grid_result = rfr.fit(features_norm[:63,:], roi_vm_mean[:63])
+yTest_fit_rfr = rfr.predict(features_norm[63:])
+
+sns.set(font_scale=1)
+
+mfit, bfit = np.polyfit(roi_vm_mean[63:], yTest_fit_rfr, 1)
+pr2 = np.corrcoef(roi_vm_mean[63:], yTest_fit_rfr)[0,1]**2
+
+plt.figure()
+plt.plot(roi_vm_mean[63:],yTest_fit_rfr,'ko')
+plt.plot(roi_vm_mean[63:], mfit*roi_vm_mean[63:] + bfit, "b--")
+
+importances = rfr.best_estimator_.feature_importances_
+indices = np.argsort(importances)[::-1]
+std = np.std([tree.feature_importances_ for tree in rfr.best_estimator_], axis = 0)
+plt.figure()
+plt.title('Feature importances')
+plt.barh(range(20), importances[indices[0:20]], yerr = std[indices[0:20]], align = 'center',log=True)
+plt.yticks(range(20), list(featureNames[i] for i in indices[0:20] ), rotation=0)
+plt.gca().invert_yaxis()
+plt.show()
+
+plt.subplots_adjust(left=0.7,bottom=0.1, right=0.8, top=0.9)
+
+# ax = sns.heatmap(
+#     corr, 
+#     vmin=-1, vmax=1, center=0,
+#     cmap=sns.diverging_palette(20, 220, n=200),
+#     square=True
+# )
+# ax.set_xticklabels(
+#     ax.get_xticklabels(),
+#     rotation=45,
+#     horizontalalignment='right'
+# );
 
 #%% Correlation Feature Value vs Density
 # fig = plt.figure()

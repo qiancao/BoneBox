@@ -19,6 +19,8 @@ from skimage.draw import line_nd
 import scipy
 from scipy.ndimage import binary_dilation
 
+# import raster_geometry as rg
+
 # import utils
 
 #%% Utilities
@@ -518,11 +520,12 @@ def drawLine(volume, vertices, edgeVertexInd):
     start = vertices[edgeVertexInd[0],:]
     end = vertices[edgeVertexInd[1],:]
     
-    lin = line_nd(start, end, endpoint = False)
+    lin = line_nd(start, end, endpoint = True)
 
     volume[lin] = 1
     
-def flood_fill_hull(image): 
+def flood_fill_hull(image):
+    # This is depricated TODO: remove
     # This is taken from:
     #   https://stackoverflow.com/questions/46310603/how-to-compute-convex-hull-image-volume-in-3d-numpy-arrays/46314485#46314485
     # A modified version may be used (TODO: test if this one is faster):
@@ -538,37 +541,55 @@ def flood_fill_hull(image):
     
     return out_img, hull
 
+def full_triangle(a, b, c):
+    # Fill trangle using bresenham_line (changed to using line_nd instead)
+    # https://stackoverflow.com/questions/60901888/draw-triangle-in-3d-numpy-array-in-python
+    ab = line_nd(a, b, endpoint=True)
+    for x in set(ab):
+        yield from line_nd(c, x, endpoint=True)
+        
+def full_surface(verts):
+    # Array of vertices corresponding to a coplanar face
+     v0 = verts[:,0]
+
 def drawFace(volume, verticesArray, faceVertexInd):
-    # VerticesArray should be in array coordinates (corner origin, unit = voxels)
-    
-    # radius for expansion along face
-    r = 1.5
+    # Vertices should be in array coordinates (corner origin, unit = voxels)
     
     for faceInd in range(len(faceVertexInd)):
-        
-        # Extract face vertices.
         faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
         
-        # Expand along face normals by radius r
-        faceNorms = computeFaceNormals([faceVerts])[0]
-        faceVertsPos = faceVerts + r*faceNorms
-        faceVertsNeg = faceVerts - r*faceNorms
-        faceVertsAll = np.vstack((faceVertsPos,faceVertsNeg)).astype(int)
+    
+    # TODO: remove old implementation
+    # # VerticesArray should be in array coordinates (corner origin, unit = voxels)
+    
+    # # radius for expansion along face
+    # r = 1.5
+    
+    # for faceInd in range(len(faceVertexInd)):
         
-        # create a volume with vertices only.
-        volume_verts = np.zeros(volume.shape)
+    #     # Extract face vertices.
+    #     faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
         
-        # Need to debug this
-        print(faceInd)
+    #     # Expand along face normals by radius r
+    #     faceNorms = computeFaceNormals([faceVerts])[0]
+    #     faceVertsPos = faceVerts + r*faceNorms
+    #     faceVertsNeg = faceVerts - r*faceNorms
+    #     faceVertsAll = np.vstack((faceVertsPos,faceVertsNeg)).astype(int)
         
-        # assign faceVerts to volume_verts
-        volume_verts[tuple(np.hsplit(faceVertsAll,3))] = 1
+    #     # create a volume with vertices only.
+    #     volume_verts = np.zeros(volume.shape)
         
-        # convex fill        
-        flood_fill_hull(volume_verts)
+    #     # Need to debug this
+    #     print(faceInd)
         
-        # add hull volume to total volume
-        volume = volume + volume_verts
+    #     # assign faceVerts to volume_verts
+    #     volume_verts[tuple(np.hsplit(faceVertsAll,3))] = 1
+        
+    #     # convex fill        
+    #     flood_fill_hull(volume_verts)
+        
+    #     # add hull volume to total volume
+    #     volume = volume + volume_verts
         
     volume = (volume>0).astype(int)
     
