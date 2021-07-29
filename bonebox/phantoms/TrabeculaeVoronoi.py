@@ -722,7 +722,7 @@ if __name__ == "__main__":
     
     volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
     volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
-    volumeDilated = dilateVolumeSphereUniform(np.logical_and(volumeEdges,volumeFaces), dilationRadius)
+    volumeDilated = dilateVolumeSphereUniform(np.logical_or(volumeEdges,volumeFaces), dilationRadius)
     # volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
     
     # Testing code for drawFaces
