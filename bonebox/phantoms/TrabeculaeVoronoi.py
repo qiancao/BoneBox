@@ -544,20 +544,47 @@ def flood_fill_hull(image):
 def full_triangle(a, b, c):
     # Fill trangle using bresenham_line (changed to using line_nd instead)
     # https://stackoverflow.com/questions/60901888/draw-triangle-in-3d-numpy-array-in-python
-    ab = line_nd(a, b, endpoint=True)
-    for x in set(ab):
-        yield from line_nd(c, x, endpoint=True)
+    # a, b and c are TUPLES of coordinates of the triangle
+    # returns SET of tuples
+    
+    def line_nd_set(a, b):
+        ab = line_nd(a, b, endpoint=True) # tuple of coordinates
+        return {tuple(x) for x in np.array(ab).T} # convert to tuple of points
+    
+    ab = line_nd_set(a, b) # set of vertices in ab
+    abc = ab.copy()
+    for x in ab:
+        abc = abc.union(line_nd_set(c, x))
+    
+    return abc
         
 def full_surface(verts):
     # Array of vertices corresponding to a coplanar face
-     v0 = verts[:,0]
+    # returns SET of integer coordinates
+    
+    # Define points of the triangle that needs to be filled
+    v0 = verts[0,:] # a
+    vk = verts[2:,:] # b
+    vj = verts[1:-1,:] # 
+    
+    surf = set()
+    for jj in range(vj.shape[0]): # for the number of triangles
+        tri = full_triangle(tuple(v0), 
+                            tuple(vk[jj,:]), 
+                            tuple(vj[jj,:]))
+        surf = surf.union(tri)
+    
+    return surf
 
 def drawFace(volume, verticesArray, faceVertexInd):
+    # Draws multiple faces
     # Vertices should be in array coordinates (corner origin, unit = voxels)
     
     for faceInd in range(len(faceVertexInd)):
         faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
-        
+        surf = full_surface(faceVerts)
+        surf = tuple(np.array(list(surf)).T) # convert from set of points to tuple of XYZ coordinates
+        volume[surf] = 1
     
     # TODO: remove old implementation
     # # VerticesArray should be in array coordinates (corner origin, unit = voxels)
@@ -661,7 +688,7 @@ if __name__ == "__main__":
     Sxyz, Nxyz = (10,10,10), (10,10,10) # volume extent in XYZ (mm), number of seeds along XYZ
     Rxyz = 1.
     edgesRetainFraction = 0.5
-    facesRetainFraction = 0.5
+    facesRetainFraction = 0.1
     dilationRadius = 3 # (voxels)
     randState = 123 # for repeatability
     
@@ -695,8 +722,8 @@ if __name__ == "__main__":
     
     volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
     volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
-    # volumeDilated = dilateVolumeSphereUniform(np.logical_and(volumeEdges,volumeFaces), dilationRadius)
-    volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
+    volumeDilated = dilateVolumeSphereUniform(np.logical_and(volumeEdges,volumeFaces), dilationRadius)
+    # volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
     
     # Testing code for drawFaces
     faceVertexInd = uniqueFacesRetain

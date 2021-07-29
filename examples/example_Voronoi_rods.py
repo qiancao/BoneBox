@@ -126,3 +126,11 @@ for rr in range(len(radii)):
         print(str(rr) + " " + str(nn))
         volume, bvtv, edgeVerticesRetain = makePhantom(radii[rr], ns[nn], edgesRetainFraction, randState)
         bvtvs[rr,nn] = bvtv
+        
+#%%
+
+bvtvs = np.load("C:\\Users\\Qian.Cao\\tmp\\bvtvs.npy")
+
+plt.imshow(bvtvs)
+plt.colorbar()
+plt.axis("off")
