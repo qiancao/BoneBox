@@ -88,12 +88,52 @@ def MinMaxNorm(x, xmin, xmax):
     return (x-xmin)/(xmax-xmin)
 
 def setEdgesZero(volume):
+    """
+    Sets edges of the volume to zero (for isosurface to generate a closed mesh.)
+
+    Parameters
+    ----------
+    volume : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    volume : TYPE
+        DESCRIPTION.
+
+    """
     
     volume[0,:,:] = 0; volume[-1,:,:] = 0;
     volume[:,0,:] = 0; volume[:,-1,:] = 0;
     volume[:,:,0] = 0; volume[:,:,-1] = 0;
     
     return volume
+
+def sampleUniformZeroOne(size, randState=None):
+    """
+    Samples a uniform distribution in [0,1), for generating distributions numerically.
+
+    Parameters
+    ----------
+    size : tuple of ints
+        Dimensions of uniform distribution.
+    randState : int or None
+        Seed used by the random generator. None is used.
+
+    Returns
+    -------
+    randomArray
+
+    """
+    
+    # Generate a random array for perturbation from [0,1)
+    if randState is not None:
+        r = np.random.RandomState(randState)
+        rarr = r.random(size)
+    else:
+        rarr = np.random.random(size)
+    
+    return rarr
 
 #%% Trabecular Phantom
 
@@ -137,7 +177,7 @@ def makeSeedPointsCartesian(Sxyz, Nxyz):
     points = np.array([xyz[dim].flatten() for dim in range(3)]).T
     
     return points
-    
+
 def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=None):
     """
     Perturb points in XY, and then perturb Z. And then performs CVT and returns 
@@ -162,11 +202,14 @@ def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=
     Np = points.shape[0]
     
     # Generate a random array for perturbation from [0,1)
-    if randState is not None:
-        r = np.random.RandomState(randState)
-        rarr = r.random((Np,3))
-    else:
-        rarr = np.random.random((Np,3))
+    rarr = sampleUniformZeroOne((Np,3), randState=randState)
+    
+    # # Generate a random array for perturbation from [0,1)
+    # if randState is not None:
+    #     r = np.random.RandomState(randState)
+    #     rarr = r.random((Np,3))
+    # else:
+    #     rarr = np.random.random((Np,3))
         
     # Sample perturbation from sphere
     R = rarr[:,0]*Rxyz
@@ -585,38 +628,6 @@ def drawFace(volume, verticesArray, faceVertexInd):
         surf = full_surface(faceVerts)
         surf = tuple(np.array(list(surf)).T) # convert from set of points to tuple of XYZ coordinates
         volume[surf] = 1
-    
-    # TODO: remove old implementation
-    # # VerticesArray should be in array coordinates (corner origin, unit = voxels)
-    
-    # # radius for expansion along face
-    # r = 1.5
-    
-    # for faceInd in range(len(faceVertexInd)):
-        
-    #     # Extract face vertices.
-    #     faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
-        
-    #     # Expand along face normals by radius r
-    #     faceNorms = computeFaceNormals([faceVerts])[0]
-    #     faceVertsPos = faceVerts + r*faceNorms
-    #     faceVertsNeg = faceVerts - r*faceNorms
-    #     faceVertsAll = np.vstack((faceVertsPos,faceVertsNeg)).astype(int)
-        
-    #     # create a volume with vertices only.
-    #     volume_verts = np.zeros(volume.shape)
-        
-    #     # Need to debug this
-    #     print(faceInd)
-        
-    #     # assign faceVerts to volume_verts
-    #     volume_verts[tuple(np.hsplit(faceVertsAll,3))] = 1
-        
-    #     # convex fill        
-    #     flood_fill_hull(volume_verts)
-        
-    #     # add hull volume to total volume
-    #     volume = volume + volume_verts
         
     volume = (volume>0).astype(int)
     
@@ -676,6 +687,56 @@ def dilateVolumeSphereUniform(volume, radius):
     
     return volumeDilated
 
+def cdfRosconi(cdfThickness=np.linspace(0,1,1000), 
+               alpha=1.71e11, beta=8.17, gamma=55.54):
+    """
+    * Input to this function has units of mm for default parameters.
+    ** Default values of alpha, beta and gamma derived from:
+       Rosconi et al. Quantitative approach to the stochastics of bone remodeling. 2012.
+     
+    thickness - range of thicknesses (in mm) considered in the pdf calculation.
+    """
+    
+    # Thickness distribution (using default parameters, thickness is in mm)
+    def distributionRosconi(t, alpha=alpha, beta=beta, gamma=gamma):
+        return alpha*(t**beta)*np.exp(-gamma*t)
+    
+    pdf = distributionRosconi(cdfThickness, alpha, beta, gamma)
+    pdf = pdf / np.sum(pdf)
+    cdf = np.cumsum(pdf)
+    
+    return cdfThickness, cdf
+
+def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
+    """
+    Sample from a Rosconi distribution.
+    Random state of uniform variable generator defined by randState
+    
+    t - thickness values corresponding to cdf.
+    cdf - 1D array of the corresponding Rosconi cdf.
+    size - shape of the output array (independent cdf).
+    
+    """
+    
+    # Generate a random array for perturbation from [0,1)
+    rarr = sampleUniformZeroOne(size, randState=randState)
+    
+    # Interpolate cdf (linear)
+    return np.interp(rarr, cdf, cdfThickness)
+
+# def dilateVolumeSphereRosconi(volume, voxelSize, alpha=1.71e11, beta=8.17, gamma=55.54):
+#     # Dilate trabecular structure based on poisson distribution
+#     # radius in units of voxels
+
+#     # create sphere
+#     radius = (T/voxelSize).astype(int) # [mm]/[mm/voxel]
+#     diam = np.arange(-radius,radius+1)
+#     xx, yy, zz = np.meshgrid(diam, diam, diam)
+    
+    
+    
+#     return volumeDilated
+
 if __name__ == "__main__":
     
     import matplotlib.pyplot as plt
@@ -730,7 +791,6 @@ if __name__ == "__main__":
     vertices = vor.vertices
     volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
     verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
-    
     
     # Visualize all edges
     # fig = plt.figure()

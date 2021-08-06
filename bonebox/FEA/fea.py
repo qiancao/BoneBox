@@ -34,9 +34,16 @@ def addPlatten(volume, plattenThicknessVoxels):
     return volume
 
 def Voxel2HexaMesh(volume, voxelSize=(1,1,1), origin=None):
-    # TODO: Directly convert voxels to hexamesh
+    # TODO: Directly convert voxels to hexamesh (bricks)
     # origin: (0,0,0) corresponds to "top left corner", defaults to None (center of volume)
-    pass
+    # returns volumetric nodes, elements hexamesh object
+    
+    a = np.random.rand(2,2)
+    volume = (a>0.5)
+    
+    xyz = np.nonzero(volume)
+    
+    return nodes, elements, hexm
 
 def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size=1, allow_degenerate=False):
     # Convert voxel image to surface
