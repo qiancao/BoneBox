@@ -33,17 +33,107 @@ def addPlatten(volume, plattenThicknessVoxels):
     
     return volume
 
-def Voxel2HexaMesh(volume, voxelSize=(1,1,1), origin=None):
-    # TODO: Directly convert voxels to hexamesh (bricks)
-    # origin: (0,0,0) corresponds to "top left corner", defaults to None (center of volume)
-    # returns volumetric nodes, elements hexamesh object
+def Voxel2HexaMeshIndexCoord(volume):
+    """
+    Directly convert voxels to hexamesh (bricks) and returns mesh in index coordinates
+        
+    Example: to retrieve nodes corresponding to element 217:
+    nodesSortedUnique[elements[217],:]
     
-    a = np.random.rand(2,2)
-    volume = (a>0.5)
+    Given the default voxelSize and origin, coordinates range from (-0.5 to dimXYZ+0.5)
     
-    xyz = np.nonzero(volume)
+    nodesSortedUnique.shape = (nodes,3)
     
-    return nodes, elements, hexm
+    """
+    
+    xx, yy, zz = np.nonzero(volume)
+    nElements = len(xx)
+    
+    # Compute list of vertex (node) coordinates
+    nodes = np.empty((3,nElements,8)) #(xyz, N, verts)
+    nodes[:] = np.NaN
+    
+    nodes[:,:,0] = np.vstack((xx-0.5, yy-0.5, zz-0.5))
+    nodes[:,:,1] = np.vstack((xx+0.5, yy-0.5, zz-0.5))
+    nodes[:,:,2] = np.vstack((xx+0.5, yy+0.5, zz-0.5))
+    nodes[:,:,3] = np.vstack((xx-0.5, yy+0.5, zz-0.5))
+    nodes[:,:,4] = np.vstack((xx-0.5, yy-0.5, zz+0.5))
+    nodes[:,:,5] = np.vstack((xx+0.5, yy-0.5, zz+0.5))
+    nodes[:,:,6] = np.vstack((xx+0.5, yy+0.5, zz+0.5))
+    nodes[:,:,7] = np.vstack((xx-0.5, yy+0.5, zz+0.5))
+    
+    nodes = np.reshape(nodes, (3,-1))
+    
+    # Simplify, keep only unique nodes (faster than np.unique)
+    nodesSortedInds = np.lexsort(nodes) # last element (z) first
+    nodesSorted = nodes[:,nodesSortedInds]
+    dnodes = np.sum(np.diff(nodesSorted, axis=1), axis=0) # assumes nodes are sorted lexigraphically
+    mask = np.hstack((True, dnodes!=0)) # mask array with unique nodes set to True on first appearance
+    nodesSortedUnique = nodesSorted[:,mask] # *** final list of node coordinates
+    
+    # Initialize array of elements, indices to nodes in nodesSortedUnique
+    elements = np.zeros(nElements*8, dtype=np.int64) # final list of elements (index of nodes in nodeSortedUnique)
+    nodeIndsOriginal = np.arange(nElements*8)
+    nodeIndsOriginalSorted = nodeIndsOriginal[nodesSortedInds]
+    nodeIndsReduced = np.cumsum(mask)-1
+    elements[nodeIndsOriginalSorted] = nodeIndsReduced
+    elements = np.reshape(elements, (nElements, 8))
+    
+    nodesSortedUnique = nodesSortedUnique.T
+    
+    return nodesSortedUnique, elements
+
+def HexaMeshIndexCoord2Voxel(nodes, elements, dim):
+    """
+    Convert hexamesh (bricks) in index coordinates to volume in voxels
+    
+    dim: dimension of volume in x, y and z in voxels (tuple)
+        
+    Example: to retrieve nodes corresponding to element 217:
+    nodesSortedUnique[elements[217],:]
+    
+    Given the default voxelSize and origin, coordinates range from (-0.5 to dimXYZ+0.5)
+    
+    nodesSortedUnique.shape = (nodes,3)
+    
+    """
+    
+    volume = np.zeros(dim, dtype=bool) # initialize volume of False
+    xyz = nodes[elements,:][:,0,:] + 0.5 # voxel coordinates of bone
+    xyz = xyz.astype(int)
+    volume[tuple(xyz.T)] = True
+    
+    return volume
+
+def Index2AbsCoords(nodes, dim, voxelSize=(1,1,1), origin=(0,0,0)):
+    """
+    Convert array of node coordinates from index coordinates to absolute coordinates
+        
+        dim: volume dimension in voxels (tuple)
+        origin: shift of origin from center of volume
+        (0,0,0) corresponds to center of volume (default), (-X/2, -Y/2, -Z/2) refers to "top left corner".
+    """
+
+    dim = np.array(dim)
+    voxelSize = np.array(voxelSize)
+    origin = np.array(origin)
+    nodes = (nodes - dim/2) * voxelSize + origin
+    return nodes
+
+def Abs2IndexCoords(nodes, dim, voxelSize=(1,1,1), origin=(0,0,0)):
+    """
+    Convert array of node coordinates from abs coordinates to index coordinates
+        
+        dim: volume dimension in voxels (tuple)
+        origin: shift of origin from center of volume
+        (0,0,0) corresponds to center of volume (default), (-X/2, -Y/2, -Z/2) refers to "top left corner".
+    """
+
+    dim = np.array(dim)
+    voxelSize = np.array(voxelSize)
+    origin = np.array(origin)
+    nodes = (nodes - origin) / voxelSize + dim/2
+    return nodes
 
 def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size=1, allow_degenerate=False):
     # Convert voxel image to surface
@@ -71,6 +161,12 @@ def isWatertight(vertices, faces):
     # Check if mesh is watertight
     mesh = trimesh.Trimesh(vertices = vertices, faces = faces)
     return mesh.is_watertight
+
+def computeFEACompressLinearHex(nodes, elements, plateThickness, \
+                             elasticModulus=17e9, poissonRatio=0.3, \
+                             force_total = 1, solver="ParadisoMKL"):
+    # Linear Finite Element Analysis with PyChrono
+    # plateThickness: Thickness of compression plates in absolute units
     
 def computeFEACompressLinear(nodes, elements, plateThickness, \
                              elasticModulus=17e9, poissonRatio=0.3, \
