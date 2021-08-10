@@ -260,6 +260,18 @@ np.save(out_dir+"PhantomX_20210623_shuffle.npy", phanHU)
 
 phanHUsh = np.load(out_dir+"PhantomX_20210623_shuffle.npy")
 
+#%% Numpy to DICOM
+
+phanHUsh = np.load(out_dir+"PhantomX_20210623_shuffle.npy")
+
+data = phanHUsh.astype(np.int32)
+
+import SimpleITK as sitk
+
+image = sitk.GetImageFromArray(data)
+
+#%%
+
 xinds = []
 yinds = []
 
