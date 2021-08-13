@@ -189,15 +189,50 @@ if __name__ == "__main__":
         axs[3].hist(arrayZZ,bins=np.linspace(0,3*np.median(arrayZZ),200)); axs[3].set_ylabel("ZZ Stress")
         plt.savefig(out_dir+"hist_"+str(fea_iter)+".png")
         plt.close("all")
-
+            
+        #%% Hexamesh Visualizer
+        # https://docs.pyvista.org/examples/00-load/create-unstructured-surface.html
         
-        #%% Visualize mesh
+        dnodes = feaResult['displacement']
         
-        cloud = pv.wrap(xyz)
-        pv.plot(cloud, scalars=arrayVM, clim=[0, 0.4], \
-                          render_points_as_spheres=False, point_size=10, cpos='xz', \
-                              screenshot=out_dir+"volume_"+str(fea_iter)+".png",off_screen=True)
+        cpos = [(-22.333459061472976, 23.940062547377757, 1.7396451897739171),
+                (-0.04999999999999982, -0.04999999999999982, -0.04999999999999982),
+                (0.037118979271661946, -0.040009842455482315, 0.9985095862757241)]
         
+        import vtk
+        from pyvistaqt import BackgroundPlotter
+        
+        cmap = plt.cm.get_cmap("viridis", 512)
+     
+        # Each cell begins with the number of points in the cell and then the points
+        # composing the cell
+        points = nodes
+        cells = np.concatenate([(np.ones(elements.shape[0],dtype="int64")*8)[:,None], elements],axis=1).ravel()
+        celltypes = np.repeat(np.array([vtk.VTK_HEXAHEDRON]), elements.shape[0])
+        offset = np.arange(elements.shape[0])*9
+        grid = pv.UnstructuredGrid(offset, cells, celltypes, points)
+        
+        pl = pv.Plotter(off_screen=True)
+        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3))
+        # pl.camera.azimuth = 0
+        pl.show(window_size=(3000,3000),cpos=cpos,screenshot=out_dir+"volume_"+str(fea_iter)+".png")
+        
+        # pl.show()
+        
+        
+        # grid.plot(show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3), cpos = "xz",
+        #                full_screen=True, screenshot=out_dir+"volume_"+str(fea_iter)+".png", off_screen=True)
+    
+    # plotter = BackgroundPlotter(window_size=(3000,3000))
+    # plotter.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3))
+    # plotter.close()
+    
+    # pl = grid.plot(show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3),
+    #               full_screen=True, off_screen=True)
+    # pl.camera.azimuth = 45
+    # pl.show()
+    
+    
     # plotter.show(screenshot=out_dir+'volume_0.png')
 
     # fig = plt.figure()
