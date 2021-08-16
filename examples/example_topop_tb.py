@@ -9,13 +9,13 @@ Created on Mon Aug  9 02:58:30 2021
 import sys
 sys.path.append('../') # use bonebox from source without having to install/build
 
-import numpy as np
-import matplotlib.pyplot as plt
-
 from bonebox.phantoms.TrabeculaeVoronoi import *
 from bonebox.FEA.fea import *
 
-from skimage.morphology import closing
+import numpy as np
+import matplotlib.pyplot as plt
+
+from skimage.morphology import ball, closing, binary_dilation
 
 def volume2mesh(volume, dimXYZ, voxelSize):
     """
@@ -68,9 +68,24 @@ def setNanToZero(x):
     x[np.isnan(x)] = 0
     return x
 
-def stiffness2ProbabilityLinear(stress, s0, slope, pmin=-1., pmax=1):
+def stressStrainVolume2StrainEnergyDensity(stress, strain, volume):
+    """    
+    For linear isotropic materials undergoing small strains.
+
+    stress/strain (Nelements x 6) where for each row components are [xx, yy, zz, xy, yz, xz]
+    
     """
-    Computes the probability of bone removal/addition given its stress.
+    
+    strainEnergyDensity = 0.5 * np.sum(stress[:,:3] * strain[:,:3],axis=1) \
+        + np.sum(stress[:,3:] * strain[:,3:],axis=1)
+    
+    return strainEnergyDensity
+
+def strainEnergyDensity2ProbabilityLinear(strainEnergyDensity, s0, slope, pmin=-1., pmax=1):
+    """
+    Computes the probability of bone removal/addition given its strain energy, based on lazy model
+    
+    Christen et al. Bone remodelling in humans is load-driven but not lazy
     
     stress: np.array of voxel stress values
     s0 (scalar): stress level corresponding to homeostasis
@@ -79,13 +94,79 @@ def stiffness2ProbabilityLinear(stress, s0, slope, pmin=-1., pmax=1):
     
     """
     
-    prop = slope * (stress - s0)
+    prop = slope * (strainEnergyDensity - s0)
     
-    return prob
+    return np.clip(prob, -1, 1)
 
-def sampleProbabilityAddRemove(p, randState):
+def strainEnergy2ProbabilityLazy(strainEnergyDensity, Ul, Uu, Ce):
+    """
+    Computes probability of bone removal/addition given its strain energy, based on lazy model.
+
+    Nowak et al. New aspects of the trabecular bone remodeling regulatory model resulting from shape optimization studies.
     
-    return output
+    Note that output is not Elastic modulus but a probability of voxel undergoing remodeling.
+    """
+    
+    prob = np.zeros(strainEnergyDensity.shape)
+    prob[strainEnergyDensity>Uu] = Ce*(strainEnergyDensity - Uu)
+    prob[strainEnergyDensity>Ul] = Ce*(strainEnergyDensity - Ul)
+    
+    return np.clip(prob, -1, 1)
+
+def sampleProbabilityAddRemove(prob, randState):
+    """
+    Generates output array with +1 denoting addition, -1 denoting removal, and 0 denoting no change,
+    given probabilities defined in prob.
+
+    """
+    
+    # Generate uniform distribution in (-1,1)
+    mask = sampleUniformZeroOne(prob.shape, randState=randState) * 2 - 1
+    
+    mask[(prob>0)&(mask>prob)] = 1
+    mask[(prob<0)&(mask<prob)] = -1
+    mask[(mask!=-1)&(mask!=1)] = 0
+    
+    return mask
+
+def volumeVoxelGrowRemove(volume, xyz, mask):
+    """
+    Add (8-neighborhood) voxels in a volume according to mask
+    Remove 
+    
+    Parameters
+    ----------
+    volume : Integer array of 0 and 1's
+        Initial Volume.
+    xyz : tuple of 3 arrays
+        tuple denoting coordinates cooresponding to mask
+    mask : 
+        Voxels to add (+1) and voxel to remove (-1)
+        
+
+    Returns
+    -------
+    volume.
+
+    """
+    
+    # Neighborhood (6-connected 3D ball)
+    nbh = ball(1)
+    
+    # Convert voxel coordinates to volume (TODO: not needed, refactor later)
+    dvolume = np.zeros(volume.shape, dtype=int)
+    dvolume[xyz] = mask
+    
+    # Assign voxels to be added
+    volumeAdd = (dvolume==1)
+    volumeAdd = binary_dilate(volumeAdd,nbh)
+    volume[volumeAdd==1] = 1
+    
+    # Assign voxels to be removed
+    volumeRemove = (dvolume==-1)
+    volume[volumeRemove==1] = 0
+    
+    return volume
 
 if __name__ == "__main__":
     
