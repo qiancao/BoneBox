@@ -17,6 +17,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
+import vtk
+from pyvistaqt import BackgroundPlotter
+
 from skimage.morphology import ball, closing, binary_dilation
 
 def volume2mesh(volume, dimXYZ, voxelSize):
@@ -118,6 +121,21 @@ def strainEnergy2ProbabilityLazy(strainEnergyDensity, Ul, Uu, Ce):
     
     return np.clip(prob, -1, 1)
 
+def strainEnergy2MaskLazyDiscrete(strainEnergyDensity, Ul, Uu):
+    """
+    Computes probability of bone removal/addition given its strain energy, based on lazy model.
+
+    Nowak et al. New aspects of the trabecular bone remodeling regulatory model resulting from shape optimization studies.
+    
+    Note that output is not Elastic modulus but a probability of voxel undergoing remodeling.
+    """
+    
+    mask = np.zeros(strainEnergyDensity.shape, dtype=int)
+    mask[strainEnergyDensity>Uu] = 1
+    mask[strainEnergyDensity<Ul] = -1
+    
+    return mask
+
 def sampleProbabilityAddRemove(prob, randState):
     """
     Generates output array with +1 denoting addition, -1 denoting removal, and 0 denoting no change,
@@ -199,7 +217,7 @@ if __name__ == "__main__":
     plattenThicknessVoxels = 2 # voxels
     elasticModulus = 17e9
     poissonRatio = 0.3
-    forceTotal = 1
+    forceTotal = 1.
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
@@ -226,21 +244,24 @@ if __name__ == "__main__":
     volumeSizeVoxels = volume.shape
     
     # General optimization parameters
-    Niters = 50
+    Niters = 100
     
     # Run Indicators
     iterVoxelsChanged = np.zeros(Niters)
     iterVoxelsTotal = np.zeros(Niters)
+    iterElasticModulus = np.zeros(Niters)
     
     # Adaptation parameters, assume intercept of -1 for 0 stress
     # using VM stress instead
-    s0 = 0.2
-    pf = np.polyfit([0,s0],[-1,0],1)
-    k = 1
-    slope = pf[0] * k
+    # s0 = 0.2
+    # pf = np.polyfit([0,s0],[-1,0],1)
+    # k = 1
+    # slope = pf[0] * k
+    Ul = 0.01
+    Uu = 1.5
     
     # Make output directory
-    out_dir = "/data/BoneBox-out/topopt/randstate_"+str(randState)+"_s0_"+str(s0)+"_k_"+str(k)+"/"
+    out_dir = "/data/BoneBox-out/topopt/lazy_randstate_"+str(randState)+"_Ul_"+str(Ul)+"_Uu_"+str(Uu)+"/"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
@@ -254,11 +275,9 @@ if __name__ == "__main__":
         volume0 = volume.copy()
     
         # Convert to hex mesh for FEA
-        volume[:,:,0] = 0
-        volume[:,:,-1] = 0
-        volumePlatten = addPlatten(volume, plattenThicknessVoxels)
+        volume = addPlatten(volume, plattenThicknessVoxels)
         
-        nodes, elements = Voxel2HexaMeshIndexCoord(volumePlatten)
+        nodes, elements = Voxel2HexaMeshIndexCoord(volume)
         nodes = Index2AbsCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize)
         
         # Finite element analysis
@@ -268,6 +287,8 @@ if __name__ == "__main__":
         
         # Compute elastic modulus
         elasticModulus = computeFEAElasticModulus(feaResult)
+        iterElasticModulus[fea_iter] = elasticModulus
+        print("Elastic Modulus:" + str(elasticModulus))
         
         # Index coordinates of elements (voxel centers)
         nodesIndexCoord = Abs2IndexCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize, origin=(0,0,0))
@@ -291,11 +312,12 @@ if __name__ == "__main__":
         #                                                                               np.prod(voxelSize)))
         # prob = strainEnergyDensity2ProbabilityLinear(strainEnergyDensity, s0, slope, pmin=-1., pmax=1)
         
-        prob = strainEnergyDensity2ProbabilityLinear(arrayVM, s0, slope, pmin=-1., pmax=1)
-        mask = sampleProbabilityAddRemove(prob, randState = randState + fea_iter)
+        # prob = strainEnergyDensity2ProbabilityLinear(arrayVM, Uu, Ul)
+        # mask = sampleProbabilityAddRemove(prob, randState = randState + fea_iter)
+        
+        mask = strainEnergy2MaskLazyDiscrete(arrayVM, Ul, Uu)
         volume1 = volumeVoxelGrowRemove(volume, xyz, mask)
-        volume1[:,:,0] = 0
-        volume1[:,:,-1] = 0
+        volume1 = addPlatten(volume1, plattenThicknessVoxels)
 
         # Convert to indexing coordinates, assign to voxels
         volumeVM = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayVM)
@@ -331,14 +353,20 @@ if __name__ == "__main__":
         
         #%% Show mask histogram
         
-        plt.hist(mask,10)
-        plt.savefig(out_dir+"dvolhist_slice50_"+str(fea_iter)+".png")
+        Nresorpt = np.sum(mask==-1)
+        Ndeposit = np.sum(mask==1)
+        Nunchanged = np.sum(mask==0)
+        
+        plt.bar([1,2,3],[Nresorpt,Nunchanged,Ndeposit])
+        plt.xticks([1,2,3], ["Resorpt", "Unchanged","Deposit"])
+        plt.savefig(out_dir+"dvolhist_slice50_"+str(fea_iter)+".png",bbox_inches='tight')
         plt.close("all")
         
         #%% Visualize stress histogram
         
         fig_vm = np.linspace(0.001,5,1000)
-        fig_p = strainEnergyDensity2ProbabilityLinear(fig_vm, s0, slope, pmin=-1., pmax=1)
+        fig_p = strainEnergy2MaskLazyDiscrete(fig_vm, Ul, Uu)
+        # fig_p = strainEnergyDensity2ProbabilityLinear(fig_vm, s0, slope, pmin=-1., pmax=1)
         
         fig, ax1 = plt.subplots()
         ax1.hist(arrayVM,bins=fig_vm)
@@ -349,7 +377,7 @@ if __name__ == "__main__":
         plt.plot(fig_vm,fig_p,'r--')
         ax2.set_ylabel('Deposition/Resorption Probability')
         
-        plt.savefig(out_dir+"hist_"+str(fea_iter)+".png")
+        plt.savefig(out_dir+"hist_"+str(fea_iter)+".png",bbox_inches='tight')
         plt.close("all")
             
         #%% Hexamesh Visualizer
@@ -358,9 +386,6 @@ if __name__ == "__main__":
         cpos = [(-22.333459061472976, 23.940062547377757, 1.7396451897739171),
                 (-0.04999999999999982, -0.04999999999999982, -0.04999999999999982),
                 (0.037118979271661946, -0.040009842455482315, 0.9985095862757241)]
-        
-        import vtk
-        from pyvistaqt import BackgroundPlotter
         
         cmap = plt.cm.get_cmap("viridis", 512)
      
@@ -382,17 +407,23 @@ if __name__ == "__main__":
         iterVoxelsTotal[fea_iter] = np.sum(volume1)
         
         fig, ax1 = plt.subplots()
-        ax1.plot(np.arange(Niters),iterVoxelsTotal,'k--')
+        ax1.plot(np.arange(Niters),iterVoxelsTotal,'k.--')
         ax1.set_xlabel('Iteration (#)')
         ax1.set_ylabel('Total Bone Voxels')
         
         ax2 = ax1.twinx()
-        plt.plot(np.arange(Niters),iterVoxelsChanged,'k-')
+        plt.plot(np.arange(Niters),iterVoxelsChanged,'ko-')
         ax2.set_ylabel('Bone Voxel Change')
         
-        plt.savefig(out_dir+"iters.png")
+        ax3 = ax1.twinx()
+        ax3.spines["right"].set_position(("axes", 1.2))
+        plt.plot(np.arange(Niters),np.abs(iterElasticModulus),'m.-')
+        ax3.set_ylabel('Elastic Modulus (a.u.)')
+        
+        plt.savefig(out_dir+"iters.png",bbox_inches='tight')
         plt.close("all")
         
         np.save(out_dir+"iterVoxelsChanged_"+str(fea_iter+1), iterVoxelsChanged)
         np.save(out_dir+"iterVoxelsTotal_"+str(fea_iter+1), iterVoxelsTotal)
+        np.save(out_dir+"iterElasticModulus_"+str(fea_iter+1), iterElasticModulus)
         

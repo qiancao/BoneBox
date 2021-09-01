@@ -527,7 +527,6 @@ g = sns.heatmap(corr, mask=mask, cmap=cmap, vmin=-1., vmax=1.,
 features_norm = pfeatures.copy()
 features_norm -= np.mean(pfeatures,axis=0) # center on mean
 features_norm /= np.std(pfeatures,axis=0) # scale to standard deviation
-
 features_norm[np.isnan(features_norm)] = 0
 
 #%% Random Forest Grid Search using 5-fold cross validation
@@ -537,7 +536,6 @@ roi_vm_mean = pstiffness
 plt.close('all')
 
 import random
-
 random.seed(1234)
 
 # non-linear without feature selection

@@ -4,6 +4,9 @@
 Created on Mon Aug  9 02:58:30 2021
 
 @author: qcao
+
+v2 - denser structures
+
 """
 
 import os
@@ -17,7 +20,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import colors
 
-from skimage.morphology import ball, closing, binary_dilation
+import vtk
+from pyvistaqt import BackgroundPlotter
+
+from skimage.morphology import ball, closing, binary_dilation, binary_closing
+
+import pyvista as pv
+pv.set_plot_theme("document")
 
 def volume2mesh(volume, dimXYZ, voxelSize):
     """
@@ -26,15 +35,6 @@ def volume2mesh(volume, dimXYZ, voxelSize):
     nodes, elements = Voxel2HexaMeshIndexCoord(volume)
     nodes = Index2AbsCoords(nodes, volumeSizeVoxels=dimXYZ, voxelSize=voxelSize)
     return nodes, elements
-
-def performFEA(nodes, elements, plateThicknessMM, elasticModulus, poissonRatio):
-    """
-    Runs FEA on nodes and elements.
-    """
-    feaResult = computeFEACompressLinearHex(nodes, elements, plateThickness=plateThickness, \
-                             elasticModulus=elasticModulus, poissonRatio=poissonRatio, \
-                             force_total = 1, solver="ParadisoMKL")
-    return feaResult
 
 def extractStresses(feaResult, dimXYZ, voxelSize):
     """
@@ -118,6 +118,21 @@ def strainEnergy2ProbabilityLazy(strainEnergyDensity, Ul, Uu, Ce):
     
     return np.clip(prob, -1, 1)
 
+def strainEnergy2MaskLazyDiscrete(strainEnergyDensity, Ul, Uu):
+    """
+    Computes probability of bone removal/addition given its strain energy, based on lazy model.
+
+    Nowak et al. New aspects of the trabecular bone remodeling regulatory model resulting from shape optimization studies.
+    
+    Note that output is not Elastic modulus but a probability of voxel undergoing remodeling.
+    """
+    
+    mask = np.zeros(strainEnergyDensity.shape, dtype=int)
+    mask[strainEnergyDensity>Uu] = 1
+    mask[strainEnergyDensity<Ul] = -1
+    
+    return mask
+
 def sampleProbabilityAddRemove(prob, randState):
     """
     Generates output array with +1 denoting addition, -1 denoting removal, and 0 denoting no change,
@@ -174,20 +189,16 @@ def volumeVoxelGrowRemove(volume, xyz, mask):
     
     return volume
 
-if __name__ == "__main__":
-    
-    import pyvista as pv
-    pv.set_plot_theme("document")
+def generateLDPhantom(Ul, randState, saveNameAppend):
     
     #% Make base structure
     
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (5,5,7.5), (5,5,7) # volume extent in XYZ (mm), number of seeds along XYZ
-    Rxyz = 0.5
-    # edgesRetainFraction = 0.5
-    # facesRetainFraction = 0.1
+    Sxyz, Nxyz = (5,5,7.5), (6,6,9) # volume extent in XYZ (mm), number of seeds along XYZ
+    Rxyz = 0.25
+    
     dilationRadius = 3 # (voxels)
-    randState = 1 # for repeatability
+    randState = randState # for repeatability # 1, 2, 3
     
     morphClosingMask = np.ones((3,3,3)) # mask for morphological closing
     
@@ -199,7 +210,7 @@ if __name__ == "__main__":
     plattenThicknessVoxels = 2 # voxels
     elasticModulus = 17e9
     poissonRatio = 0.3
-    forceTotal = 1
+    forceTotal = 1.
     
     # Generate faces and edges
     points = makeSeedPointsCartesian(Sxyz, Nxyz)
@@ -221,30 +232,32 @@ if __name__ == "__main__":
     uniqueFacesRetain = uniqueFaces
     volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxelsInitial)
     
-    # Morphological closing on volume of edges
+    # Crop and Morphological closing on volume of edges
     volume = volumeFaces[:,:,25:125]
     volumeSizeVoxels = volume.shape
+    # volume = binary_dilation(volume, morphDilationMask)
+    volume = binary_closing(volume, morphClosingMask)
+    volume = addPlatten(volume, plattenThicknessVoxels)
     
     # General optimization parameters
-    Niters = 50
+    Niters = 8
     
     # Run Indicators
     iterVoxelsChanged = np.zeros(Niters)
     iterVoxelsTotal = np.zeros(Niters)
+    iterElasticModulus = np.zeros(Niters)
     
     # Adaptation parameters, assume intercept of -1 for 0 stress
     # using VM stress instead
-    s0 = 0.2
-    pf = np.polyfit([0,s0],[-1,0],1)
-    k = 1
-    slope = pf[0] * k
+    Ul = Ul # 0.1 and 0.2
+    Uu = 0.8
     
     # Make output directory
-    out_dir = "/data/BoneBox-out/topopt/randstate_"+str(randState)+"_s0_"+str(s0)+"_k_"+str(k)+"/"
+    out_dir = "/data/BoneBox-out/topopt/lazy_v3_sweep/randstate_"+str(randState)+saveNameAppend+"/"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
-    #%% Iteratively perform FEA and augment volume shape
+    #% Iteratively perform FEA and augment volume shape
     
     np.save(out_dir+"volume_"+str(0), volume)
     
@@ -254,11 +267,9 @@ if __name__ == "__main__":
         volume0 = volume.copy()
     
         # Convert to hex mesh for FEA
-        volume[:,:,0] = 0
-        volume[:,:,-1] = 0
-        volumePlatten = addPlatten(volume, plattenThicknessVoxels)
+        volume = addPlatten(volume, plattenThicknessVoxels)
         
-        nodes, elements = Voxel2HexaMeshIndexCoord(volumePlatten)
+        nodes, elements = Voxel2HexaMeshIndexCoord(volume)
         nodes = Index2AbsCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize)
         
         # Finite element analysis
@@ -268,14 +279,14 @@ if __name__ == "__main__":
         
         # Compute elastic modulus
         elasticModulus = computeFEAElasticModulus(feaResult)
+        iterElasticModulus[fea_iter] = elasticModulus
+        print("Elastic Modulus:" + str(elasticModulus))
         
         # Index coordinates of elements (voxel centers)
         nodesIndexCoord = Abs2IndexCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize, origin=(0,0,0))
         xyz = (nodesIndexCoord[elements,:][:,0,:] + 0.5).astype(int)
-        
-        np.save(out_dir+"xyz_"+str(fea_iter), xyz)
-        
-        xyz = tuple(xyz.T)
+
+        xyzTuple = tuple(xyz.T)
         
         # Take absolute stresses
         arrayVM = setNanToZero(feaResult["elementVMstresses"].flatten())
@@ -283,20 +294,18 @@ if __name__ == "__main__":
         arrayYY = setNanToZero(np.abs(feaResult["elementStresses"][:,1]))
         arrayZZ = setNanToZero(np.abs(feaResult["elementStresses"][:,2]))
         
-        np.save(out_dir+"arrayVM_"+str(fea_iter), arrayVM)
+        # print("median strain energy:"+str(np.median(strainEnergyDensity)))
+        print("median VM Stress:"+str(np.median(arrayVM)))
         
-        # Compute strain energy, probability, 
-        # strainEnergyDensity = setNanToZero(stressStrainVolume2StrainEnergyDensity(feaResult["elementStresses"], \
-        #                                                                           feaResult["elementStrains"], \
-        #                                                                               np.prod(voxelSize)))
-        # prob = strainEnergyDensity2ProbabilityLinear(strainEnergyDensity, s0, slope, pmin=-1., pmax=1)
-        
-        prob = strainEnergyDensity2ProbabilityLinear(arrayVM, s0, slope, pmin=-1., pmax=1)
-        mask = sampleProbabilityAddRemove(prob, randState = randState + fea_iter)
-        volume1 = volumeVoxelGrowRemove(volume, xyz, mask)
-        volume1[:,:,0] = 0
-        volume1[:,:,-1] = 0
+        # If MKL fails, will generate unlikely distribution
+        if (np.median(arrayVM)>3.) or (np.median(arrayVM)<1e-3): # median VM stress implausibly large or small
+            raise ValueError('MKL Solver probably failed, terminating this run')
 
+        # Compute strain energy, probability, (using VM stress instead here)
+        mask = strainEnergy2MaskLazyDiscrete(arrayVM, Ul, Uu)
+        volume1 = volumeVoxelGrowRemove(volume, xyzTuple, mask)
+        volume1 = addPlatten(volume1, plattenThicknessVoxels)
+ 
         # Convert to indexing coordinates, assign to voxels
         volumeVM = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayVM)
         volumeXX = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayXX)
@@ -304,13 +313,7 @@ if __name__ == "__main__":
         volumeZZ = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayZZ)
         # volumeSED = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, strainEnergyDensity)
 
-        np.save(out_dir+"volume_"+str(fea_iter+1), volume1)
-        
-        # print("median strain energy:"+str(np.median(strainEnergyDensity)))
-        print("median VM Stress:"+str(np.median(arrayVM)))
-
-        #%% Show volume slice (sagittal)
-        
+        #% Show volume slice (sagittal)
         dvolume = volume1.astype(int)-volume0.astype(int)
         volumeShow = np.zeros(volume.shape).astype(int)
         volumeShow[volume0==1] = 2
@@ -329,38 +332,43 @@ if __name__ == "__main__":
         plt.savefig(out_dir+"vol_slice50_"+str(fea_iter)+".png")
         plt.close("all")
         
-        #%% Show mask histogram
+        #% Show mask histogram
         
-        plt.hist(mask,10)
-        plt.savefig(out_dir+"dvolhist_slice50_"+str(fea_iter)+".png")
+        Nresorpt = np.sum(mask==-1)
+        Ndeposit = np.sum(mask==1)
+        Nunchanged = np.sum(mask==0)
+        
+        plt.bar([1,2,3],[Nresorpt,Nunchanged,Ndeposit])
+        plt.xticks([1,2,3], ["Resorpt", "Unchanged","Deposit"])
+        plt.savefig(out_dir+"dvolhist_slice50_"+str(fea_iter)+".png",bbox_inches='tight')
         plt.close("all")
         
-        #%% Visualize stress histogram
+        #% Visualize stress histogram
         
         fig_vm = np.linspace(0.001,5,1000)
-        fig_p = strainEnergyDensity2ProbabilityLinear(fig_vm, s0, slope, pmin=-1., pmax=1)
+        fig_p = strainEnergy2MaskLazyDiscrete(fig_vm, Ul, Uu)
+        # fig_p = strainEnergyDensity2ProbabilityLinear(fig_vm, s0, slope, pmin=-1., pmax=1)
         
         fig, ax1 = plt.subplots()
         ax1.hist(arrayVM,bins=fig_vm)
         ax1.set_xlabel('Von Mises Stress (MPa)')
         ax1.set_ylabel('# Elements (Voxels)')
+        ax1.set_xlim(0,1.2)
         
         ax2 = ax1.twinx()
         plt.plot(fig_vm,fig_p,'r--')
         ax2.set_ylabel('Deposition/Resorption Probability')
         
-        plt.savefig(out_dir+"hist_"+str(fea_iter)+".png")
+        plt.savefig(out_dir+"hist_"+str(fea_iter)+".png",bbox_inches='tight')
         plt.close("all")
-            
-        #%% Hexamesh Visualizer
+        
+
+        #% Hexamesh Visualizer
         # https://docs.pyvista.org/examples/00-load/create-unstructured-surface.html
         
         cpos = [(-22.333459061472976, 23.940062547377757, 1.7396451897739171),
                 (-0.04999999999999982, -0.04999999999999982, -0.04999999999999982),
                 (0.037118979271661946, -0.040009842455482315, 0.9985095862757241)]
-        
-        import vtk
-        from pyvistaqt import BackgroundPlotter
         
         cmap = plt.cm.get_cmap("viridis", 512)
      
@@ -372,27 +380,136 @@ if __name__ == "__main__":
         grid = pv.UnstructuredGrid(offset, cells, celltypes, points)
         
         pl = pv.Plotter(off_screen=True)
-        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,2))
+        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,1))
         pl.show(window_size=(3000,3000),cpos=cpos,screenshot=out_dir+"volume_"+str(fea_iter)+".png")
+    
+    
+    # Save final phantom, both in volume and in mesh form
+    np.save(out_dir+"volume_"+str(fea_iter+1), volume1)
+    np.save(out_dir+"arrayVM_"+str(fea_iter), arrayVM)
+    np.save(out_dir+"xyz"+str(fea_iter), xyz)
+    
+    # Save input parameters
+    np.save(out_dir+"xyz"+str(fea_iter), xyz)
+    
+    # Output phantom properties (for BVF crop to avoid edge effects and platten).
+    cropped_volume = volume1[15:85,15:85,15:85]
+    out_bvf = np.sum(cropped_volume==1) / np.prod(cropped_volume.shape)
+    out_elasticModulus = iterElasticModulus[-1]
+    
+    # Save BVF and Elastoc Modulus in seperate folders
+    np.save(out_dir+"bvf"+str(fea_iter), out_bvf)
+    np.save(out_dir+"elasticModulus"+str(fea_iter), out_elasticModulus)
+    
+    del volume, volume0, volume1, feaResult
+    
+    return out_dir, out_bvf, out_elasticModulus
+
+if __name__ == "__main__":
+    
+    import gc
+    import os
+    import psutil
+    import signal
+    
+    # Try to launch function in seperate process to release unreachable memeory
+    from multiprocessing import Process, Queue
+    
+    save_dir = "/data/BoneBox-out/topopt/lazy_v3_sweep/"
+    if not os.path.exists(save_dir):
+        os.makedirs(save_dir)
+    
+    # Generate N phantom series, 3 resorption intensities per series
+    Nseries = 400
+    Nresorption = 3
+    
+    # Track BVF and Elastic Moduli
+    if os.path.exists(save_dir+"bvfs.npy"):
+        bvfs = np.load(save_dir+"bvfs.npy")
+    else:
+        bvfs = np.zeros((Nseries, Nresorption)); bvfs[:] = np.nan
+    
+    if os.path.exists(save_dir+"Es.npy"):
+        Es = np.load(save_dir+"Es.npy")
+    else:
+        Es = np.zeros((Nseries, Nresorption)); Es[:] = np.nan
+    
+    # Track Exception
+    exceptedInstances = np.zeros((Nseries, Nresorption),dtype=bool)
+    
+    # Generate array of random Uls (between 0.1 and 0.25)
+    randStateUls = 3012
+    Ulmin = 0.1
+    Ulmax = 0.25
+    Uls = sampleUniformZeroOne(((Nseries,Nresorption)), randState=randStateUls)*(Ulmax-Ulmin) + Ulmin
+    
+    # Save input parameters
+    np.save(save_dir+"Uls", Uls)
+    np.save(save_dir+"randStateUls", randStateUls)
+    
+    # Generate array of random seeds for scaffolding
+    scaffoldSeeds = np.arange(Nseries,dtype=int)
+
+    #%% Loop
+    for ss in scaffoldSeeds[84:]:
+        for uu in range(Nresorption):
+            
+            print("==>> Phantom "+str(ss))
+            print("Ul="+str(Uls[ss,uu]))
+            
+            # String appended to the end of folder name
+            saveNameAppend = "_phantom_ss_"+str(ss)+"_uu_"+str(uu)
+            
+            # Catch failed mkl solutions
+            try:
+                out_dir, BVF, elasticModulus = generateLDPhantom(Uls[ss,uu], ss, saveNameAppend)
+                
+                # p = Process(generateLDPhantom, args=(Uls[ss,uu], ss, saveNameAppend))
+                # p.start()
+                # p.join()
+                
+                gc.collect()
+                print("BVF="+str(BVF))
+                print("elasticModulus="+str(elasticModulus))
+                
+                bvfs[ss,uu] = BVF
+                Es[ss,uu] = elasticModulus
+                
+                np.save(save_dir+"bvfs", bvfs)
+                np.save(save_dir+"Es", Es)
+                
+            except:
+                print("MKL solver failed... moving on")
+                exceptedInstances[ss,uu] = True
+                # np.save(out_dir+"excepted", True)
+                
+            #% Remove all other processes other than main (persistent mkl kernels not ending)
+            currentId = os.getpid()
+            allPyIds = [p.pid for p in psutil.process_iter() if "python" in str(p.name)]
+            PyIdsToKill = [x for x in allPyIds if x != currentId]
+            for PyId in PyIdsToKill:
+                os.kill(PyId, signal.SIGTERM)
+
+    #%%
+    
+    # ss = seed = 64; uu = 2
+    # print("==>> Phantom "+str(ss))
+    # print("Ul="+str(Uls[ss,uu]))
+    
+    # # String appended to the end of folder name
+    # saveNameAppend = "_phantom_ss_"+str(ss)+"_uu_"+str(uu)
+    
+    # try:
+    #     out_dir, BVF, elasticModulus = generateLDPhantom(Uls[ss,uu], seed, saveNameAppend)
+    #     print("BVF="+str(BVF))
+    #     print("elasticModulus="+str(elasticModulus))
         
-        #%%
+    #     bvfs[ss,uu] = BVF
+    #     Es[ss,uu] = elasticModulus
         
-        # iterVoxelChbanged and Total
-        iterVoxelsChanged[fea_iter] = np.sum(np.abs(dvolume))
-        iterVoxelsTotal[fea_iter] = np.sum(volume1)
+    #     np.save(save_dir+"bvfs", bvfs)
+    #     np.save(save_dir+"Es", Es)
         
-        fig, ax1 = plt.subplots()
-        ax1.plot(np.arange(Niters),iterVoxelsTotal,'k--')
-        ax1.set_xlabel('Iteration (#)')
-        ax1.set_ylabel('Total Bone Voxels')
-        
-        ax2 = ax1.twinx()
-        plt.plot(np.arange(Niters),iterVoxelsChanged,'k-')
-        ax2.set_ylabel('Bone Voxel Change')
-        
-        plt.savefig(out_dir+"iters.png")
-        plt.close("all")
-        
-        np.save(out_dir+"iterVoxelsChanged_"+str(fea_iter+1), iterVoxelsChanged)
-        np.save(out_dir+"iterVoxelsTotal_"+str(fea_iter+1), iterVoxelsTotal)
-        
+    # except:
+    #     print("MKL solver failed... moving on")
+    

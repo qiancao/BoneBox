@@ -6,7 +6,6 @@ Created on Mon Aug  9 02:58:30 2021
 @author: qcao
 """
 
-import os
 import sys
 sys.path.append('../') # use bonebox from source without having to install/build
 
@@ -15,7 +14,6 @@ from bonebox.FEA.fea import *
 
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib import colors
 
 from skimage.morphology import ball, closing, binary_dilation
 
@@ -76,9 +74,6 @@ def stressStrainVolume2StrainEnergyDensity(stress, strain, volume):
 
     stress/strain (Nelements x 6) where for each row components are [xx, yy, zz, xy, yz, xz]
     
-    Helpful link:
-        http://homepages.engineering.auckland.ac.nz/~pkel015/SolidMechanicsBooks/Part_I/BookSM_Part_I/08_Energy/08_Energy_02_Elastic_Strain_Energy.pdf
-    
     """
     
     strainEnergyDensity = 0.5 * np.sum(stress[:,:3] * strain[:,:3],axis=1) \
@@ -99,7 +94,7 @@ def strainEnergyDensity2ProbabilityLinear(strainEnergyDensity, s0, slope, pmin=-
     
     """
     
-    prob = slope * (strainEnergyDensity - s0)
+    prop = slope * (strainEnergyDensity - s0)
     
     return np.clip(prob, -1, 1)
 
@@ -128,8 +123,8 @@ def sampleProbabilityAddRemove(prob, randState):
     # Generate uniform distribution in (-1,1)
     mask = sampleUniformZeroOne(prob.shape, randState=randState) * 2 - 1
     
-    mask[(prob>0)&(mask<prob)] = 1
-    mask[(prob<0)&(mask>prob)] = -1
+    mask[(prob>0)&(mask>prob)] = 1
+    mask[(prob<0)&(mask<prob)] = -1
     mask[(mask!=-1)&(mask!=1)] = 0
     
     return mask
@@ -156,8 +151,7 @@ def volumeVoxelGrowRemove(volume, xyz, mask):
     """
     
     # Neighborhood (6-connected 3D ball)
-    # nbh = ball(1)
-    nbh = np.ones((3,3,3))
+    nbh = ball(1)
     
     # Convert voxel coordinates to volume (TODO: not needed, refactor later)
     dvolume = np.zeros(volume.shape, dtype=int)
@@ -165,7 +159,7 @@ def volumeVoxelGrowRemove(volume, xyz, mask):
     
     # Assign voxels to be added
     volumeAdd = (dvolume==1)
-    volumeAdd = binary_dilation(volumeAdd,nbh)
+    volumeAdd = binary_dilate(volumeAdd,nbh)
     volume[volumeAdd==1] = 1
     
     # Assign voxels to be removed
@@ -182,12 +176,12 @@ if __name__ == "__main__":
     #% Make base structure
     
     # Parameters for generating phantom mesh
-    Sxyz, Nxyz = (5,5,7.5), (5,5,7) # volume extent in XYZ (mm), number of seeds along XYZ
+    Sxyz, Nxyz = (10,10,15), (8,8,8) # volume extent in XYZ (mm), number of seeds along XYZ
     Rxyz = 0.5
     # edgesRetainFraction = 0.5
     # facesRetainFraction = 0.1
     dilationRadius = 3 # (voxels)
-    randState = 1 # for repeatability
+    randState = 123 # for repeatability
     
     morphClosingMask = np.ones((3,3,3)) # mask for morphological closing
     
@@ -218,142 +212,92 @@ if __name__ == "__main__":
     faceNormas = computeFaceNormals(faceVertices)
     
     # Make edge volume
+    # uniqueEdgesRetain = uniqueEdges
     uniqueFacesRetain = uniqueFaces
+    # volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
     volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxelsInitial)
     
     # Morphological closing on volume of edges
+    # volumeSkeleton = closing(np.logical_or(volumeEdges,volumeFaces),morphClosingMask)
+    # volumeSkeleton = closing(volumeEdges, morphClosingMask)
     volume = volumeFaces[:,:,25:125]
     volumeSizeVoxels = volume.shape
+
+    # volume = dilateVolumeSphereUniform(volumeSkeleton, dilationRadius)
     
-    # General optimization parameters
-    Niters = 50
+    import os
     
-    # Run Indicators
-    iterVoxelsChanged = np.zeros(Niters)
-    iterVoxelsTotal = np.zeros(Niters)
-    
-    # Adaptation parameters, assume intercept of -1 for 0 stress
-    # using VM stress instead
-    s0 = 0.2
-    pf = np.polyfit([0,s0],[-1,0],1)
-    k = 1
-    slope = pf[0] * k
-    
-    # Make output directory
-    out_dir = "/data/BoneBox-out/topopt/randstate_"+str(randState)+"_s0_"+str(s0)+"_k_"+str(k)+"/"
+    out_dir = "/data/BoneBox-out/topopt/R_"+str(Rxyz)+"/"
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
     
     #%% Iteratively perform FEA and augment volume shape
     
-    np.save(out_dir+"volume_"+str(0), volume)
-    
-    for fea_iter in np.arange(Niters):
-        
-        # Save original volume at the start of iteration
-        volume0 = volume.copy()
+    for fea_iter in np.arange(5):
     
         # Convert to hex mesh for FEA
         volume[:,:,0] = 0
         volume[:,:,-1] = 0
         volumePlatten = addPlatten(volume, plattenThicknessVoxels)
-        
         nodes, elements = Voxel2HexaMeshIndexCoord(volumePlatten)
         nodes = Index2AbsCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize)
         
-        # Finite element analysis
+        
+        
         feaResult = computeFEACompressLinearHex(nodes, elements, plateThickness=plattenThicknessVoxels * voxelSize[0], \
                                  elasticModulus=elasticModulus, poissonRatio=poissonRatio, \
                                  force_total = forceTotal, solver="ParadisoMKL")
         
-        # Compute elastic modulus
         elasticModulus = computeFEAElasticModulus(feaResult)
-        
-        # Index coordinates of elements (voxel centers)
-        nodesIndexCoord = Abs2IndexCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize, origin=(0,0,0))
-        xyz = (nodesIndexCoord[elements,:][:,0,:] + 0.5).astype(int)
-        
-        np.save(out_dir+"xyz_"+str(fea_iter), xyz)
-        
-        xyz = tuple(xyz.T)
-        
+    
         # Take absolute stresses
         arrayVM = setNanToZero(feaResult["elementVMstresses"].flatten())
         arrayXX = setNanToZero(np.abs(feaResult["elementStresses"][:,0]))
         arrayYY = setNanToZero(np.abs(feaResult["elementStresses"][:,1]))
         arrayZZ = setNanToZero(np.abs(feaResult["elementStresses"][:,2]))
         
-        np.save(out_dir+"arrayVM_"+str(fea_iter), arrayVM)
-        
-        # Compute strain energy, probability, 
-        # strainEnergyDensity = setNanToZero(stressStrainVolume2StrainEnergyDensity(feaResult["elementStresses"], \
-        #                                                                           feaResult["elementStrains"], \
-        #                                                                               np.prod(voxelSize)))
-        # prob = strainEnergyDensity2ProbabilityLinear(strainEnergyDensity, s0, slope, pmin=-1., pmax=1)
-        
-        prob = strainEnergyDensity2ProbabilityLinear(arrayVM, s0, slope, pmin=-1., pmax=1)
-        mask = sampleProbabilityAddRemove(prob, randState = randState + fea_iter)
-        volume1 = volumeVoxelGrowRemove(volume, xyz, mask)
-        volume1[:,:,0] = 0
-        volume1[:,:,-1] = 0
-
         # Convert to indexing coordinates, assign to voxels
+        nodesIndexCoord = Abs2IndexCoords(nodes, volumeSizeVoxels, voxelSize=voxelSize, origin=(0,0,0))
         volumeVM = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayVM)
         volumeXX = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayXX)
         volumeYY = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayYY)
         volumeZZ = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, arrayZZ)
-        # volumeSED = HexaMeshIndexCoord2VoxelValue(nodesIndexCoord, elements, volumeSizeVoxels, strainEnergyDensity)
-
-        np.save(out_dir+"volume_"+str(fea_iter+1), volume1)
+            
+        xyz = (nodesIndexCoord[elements,:][:,0,:] + 0.5).astype(int)
         
-        # print("median strain energy:"+str(np.median(strainEnergyDensity)))
-        print("median VM Stress:"+str(np.median(arrayVM)))
-
-        #%% Show volume slice (sagittal)
+        # Volume Update
+        t0percentile = 20
+        t0mask = arrayVM < np.percentile(arrayVM,t0percentile)
         
-        dvolume = volume1.astype(int)-volume0.astype(int)
-        volumeShow = np.zeros(volume.shape).astype(int)
-        volumeShow[volume0==1] = 2
-        volumeShow[dvolume==-1] = 1
-        volumeShow[dvolume==1] = 3
+        dvolume = setVoxelsOne(np.zeros(volume.shape),xyz[t0mask,:])
         
-        # make a color map of fixed colors
-        cmap = colors.ListedColormap(['white','red','gray','blue'])
-        bounds=[-0.5, 0.5, 1.5, 2.5, 3.5]
-        norm = colors.BoundaryNorm(bounds, cmap.N)
+        np.save(out_dir+"volume_"+str(fea_iter),volume)
+        np.save(out_dir+"dvolume_"+str(fea_iter),dvolume)
         
-        fig = plt.figure(frameon=False)
-        plt.imshow(volumeShow[:,50,:].T, cmap=cmap, norm=norm)
+        #%%
+        
+        plt.imshow(volume[:,50,:].T + dvolume[:,50,:].T)
         plt.axis("off")
-        plt.axis("tight")
         plt.savefig(out_dir+"vol_slice50_"+str(fea_iter)+".png")
         plt.close("all")
         
-        #%% Show mask histogram
-        
-        plt.hist(mask,10)
-        plt.savefig(out_dir+"dvolhist_slice50_"+str(fea_iter)+".png")
-        plt.close("all")
+        volume = ((volume - dvolume)>0).astype(float)
         
         #%% Visualize stress histogram
         
-        fig_vm = np.linspace(0.001,5,1000)
-        fig_p = strainEnergyDensity2ProbabilityLinear(fig_vm, s0, slope, pmin=-1., pmax=1)
-        
-        fig, ax1 = plt.subplots()
-        ax1.hist(arrayVM,bins=fig_vm)
-        ax1.set_xlabel('Von Mises Stress (MPa)')
-        ax1.set_ylabel('# Elements (Voxels)')
-        
-        ax2 = ax1.twinx()
-        plt.plot(fig_vm,fig_p,'r--')
-        ax2.set_ylabel('Deposition/Resorption Probability')
-        
+        fig, axs = plt.subplots(2,2,figsize=(20,12)); axs = axs.ravel()
+        fig.suptitle('Stress Components Histogram')
+        axs[0].hist(arrayVM,bins=np.linspace(0,3*np.median(arrayVM),200)); axs[0].set_ylabel("VM Stress")
+        axs[1].hist(arrayXX,bins=np.linspace(0,3*np.median(arrayXX),200)); axs[1].set_ylabel("XX Stress")
+        axs[2].hist(arrayYY,bins=np.linspace(0,3*np.median(arrayYY),200)); axs[2].set_ylabel("YY Stress")
+        axs[3].hist(arrayZZ,bins=np.linspace(0,3*np.median(arrayZZ),200)); axs[3].set_ylabel("ZZ Stress")
         plt.savefig(out_dir+"hist_"+str(fea_iter)+".png")
         plt.close("all")
             
         #%% Hexamesh Visualizer
         # https://docs.pyvista.org/examples/00-load/create-unstructured-surface.html
+        
+        dnodes = feaResult['displacement']
         
         cpos = [(-22.333459061472976, 23.940062547377757, 1.7396451897739171),
                 (-0.04999999999999982, -0.04999999999999982, -0.04999999999999982),
@@ -364,7 +308,8 @@ if __name__ == "__main__":
         
         cmap = plt.cm.get_cmap("viridis", 512)
      
-        # Each cell begins with the number of points in the cell and then the points composing the cell
+        # Each cell begins with the number of points in the cell and then the points
+        # composing the cell
         points = nodes
         cells = np.concatenate([(np.ones(elements.shape[0],dtype="int64")*8)[:,None], elements],axis=1).ravel()
         celltypes = np.repeat(np.array([vtk.VTK_HEXAHEDRON]), elements.shape[0])
@@ -372,27 +317,66 @@ if __name__ == "__main__":
         grid = pv.UnstructuredGrid(offset, cells, celltypes, points)
         
         pl = pv.Plotter(off_screen=True)
-        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,2))
+        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3))
+        # pl.camera.azimuth = 0
         pl.show(window_size=(3000,3000),cpos=cpos,screenshot=out_dir+"volume_"+str(fea_iter)+".png")
         
-        #%%
+        #%% Hexamesh Visualizer
+        # https://docs.pyvista.org/examples/00-load/create-unstructured-surface.html
         
-        # iterVoxelChbanged and Total
-        iterVoxelsChanged[fea_iter] = np.sum(np.abs(dvolume))
-        iterVoxelsTotal[fea_iter] = np.sum(volume1)
+        dnodes = feaResult['displacement']
         
-        fig, ax1 = plt.subplots()
-        ax1.plot(np.arange(Niters),iterVoxelsTotal,'k--')
-        ax1.set_xlabel('Iteration (#)')
-        ax1.set_ylabel('Total Bone Voxels')
+        cpos = [(-22.333459061472976, 23.940062547377757, 1.7396451897739171),
+                (-0.04999999999999982, -0.04999999999999982, -0.04999999999999982),
+                (0.037118979271661946, -0.040009842455482315, 0.9985095862757241)]
         
-        ax2 = ax1.twinx()
-        plt.plot(np.arange(Niters),iterVoxelsChanged,'k-')
-        ax2.set_ylabel('Bone Voxel Change')
+        import vtk
+        from pyvistaqt import BackgroundPlotter
         
-        plt.savefig(out_dir+"iters.png")
-        plt.close("all")
+        cmap = plt.cm.get_cmap("viridis", 512)
+     
+        # Each cell begins with the number of points in the cell and then the points
+        # composing the cell
+        points = nodes + dnodes
+        cells = np.concatenate([(np.ones(elements.shape[0],dtype="int64")*8)[:,None], elements],axis=1).ravel()
+        celltypes = np.repeat(np.array([vtk.VTK_HEXAHEDRON]), elements.shape[0])
+        offset = np.arange(elements.shape[0])*9
+        grid = pv.UnstructuredGrid(offset, cells, celltypes, points)
         
-        np.save(out_dir+"iterVoxelsChanged_"+str(fea_iter+1), iterVoxelsChanged)
-        np.save(out_dir+"iterVoxelsTotal_"+str(fea_iter+1), iterVoxelsTotal)
+        pl = pv.Plotter(off_screen=True)
+        pl.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3))
+        # pl.camera.azimuth = 0
+        pl.show(window_size=(3000,3000),cpos=cpos,screenshot=out_dir+"dvolume_"+str(fea_iter)+".png")
+    
         
+        # pl.show()
+        
+        
+        # grid.plot(show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3), cpos = "xz",
+        #                full_screen=True, screenshot=out_dir+"volume_"+str(fea_iter)+".png", off_screen=True)
+    
+    # plotter = BackgroundPlotter(window_size=(3000,3000))
+    # plotter.add_mesh(grid,show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3))
+    # plotter.close()
+    
+    # pl = grid.plot(show_edges=True, scalars=arrayVM, cmap=cmap, clim=(0,0.3),
+    #               full_screen=True, off_screen=True)
+    # pl.camera.azimuth = 45
+    # pl.show()
+    
+    
+    # plotter.show(screenshot=out_dir+'volume_0.png')
+
+    # fig = plt.figure()
+    # ax = plt.axes(projection='3d')
+    # ax.scatter3D(xyz[:,0], xyz[:,1], xyz[:,2], \
+    #              c=feaResult["elementVMstresses"].flatten(), cmap='plasma');
+    
+    # ma = (nodesIndexCoord+0.5).astype(int)
+        
+    # from mpl_toolkits.mplot3d import Axes3D
+    # fig = plt.figure()
+    # ax = fig.gca(projection='3d')
+    # # ax.set_aspect('equal')
+    # ax.voxels(volume, edgecolor="k")
+    # plt.show()

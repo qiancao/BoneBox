@@ -28,9 +28,16 @@ def addPlatten(volume, plattenThicknessVoxels):
     # leaves a single-voxel space at the edge of volume (for isosurface)
     
     vmax = np.max(volume)
+    vmin = np.min(volume)
+    
+    # Leaves single-voxel space at edge of volume for isosurface ops
+    volume[:,:,0] = vmin
+    volume[:,:,-1] = vmin
+    
+    # Define platten
     volume[1:-1,1:-1,1:plattenThicknessVoxels] = vmax
     volume[1:-1,1:-1,-plattenThicknessVoxels:-1] = vmax
-    
+
     return volume
 
 def Voxel2HexaMeshIndexCoord(volume):
@@ -43,7 +50,6 @@ def Voxel2HexaMeshIndexCoord(volume):
     Given the default voxelSize and origin, coordinates range from (-0.5 to dimXYZ+0.5)
     
     nodesSortedUnique.shape = (nodes,3)
-    
     """
     
     xx, yy, zz = np.nonzero(volume)
@@ -329,6 +335,8 @@ def computeFEACompressLinearHex(nodes, elements, plateThickness, \
         "elementStrains" : ele_Tstrain,
         "force" : force_total
         }
+    
+    del mesh, solver, system
     
     return feaResult
     
