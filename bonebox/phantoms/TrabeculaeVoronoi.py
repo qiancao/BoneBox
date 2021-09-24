@@ -677,7 +677,10 @@ def makeSkeletonVolumeFaces(vertices, faceInds, voxelSize, volumeSizeVoxels):
     return volume
 
 def dilateVolumeSphereUniform(volume, radius):
-    # radius is in units of voxels
+    """
+    Binary dilation of skeletal mask with spherical mask with specified radius.
+    
+    """
     
     diam = np.arange(-radius,radius+1)
     xx, yy, zz = np.meshgrid(diam, diam, diam)
@@ -724,6 +727,37 @@ def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
     # Interpolate cdf (linear)
     return np.interp(rarr, cdf, cdfThickness)
 
+def thicknessOrientationDisributionFunctionKinney(theta, phi):
+    """
+    Returns mean trabecular thickness per orientation.
+    
+    Kinney et al. An orientation distribution function for trabecular bone.
+    https://reader.elsevier.com/reader/sd/pii/S8756328204003734?token=C6F2ADE8594DCAB20514450AC22BE062BC81E235B0D2AE2AFEC24A86078B22526169261B2108B6CCF49685FB96F36B00&originRegion=us-east-1&originCreation=20210924183910
+    
+    Figure 5.
+
+    Returns
+    -------
+    None.
+
+    """
+    
+    
+    
+    return None
+    
+def massOrientationDistributionFunctionKinney(theta, phi):
+    """
+    Compute relative mass of trabeculae given orientation.
+    
+    Kinney et al. An orientation distribution function for trabecular bone.
+
+    Returns
+    -------
+    None.
+
+    """
+
 # def dilateVolumeSphereRosconi(volume, voxelSize, alpha=1.71e11, beta=8.17, gamma=55.54):
 #     # Dilate trabecular structure based on poisson distribution
 #     # radius in units of voxels
@@ -732,9 +766,7 @@ def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
 #     radius = (T/voxelSize).astype(int) # [mm]/[mm/voxel]
 #     diam = np.arange(-radius,radius+1)
 #     xx, yy, zz = np.meshgrid(diam, diam, diam)
-    
-    
-    
+
 #     return volumeDilated
 
 if __name__ == "__main__":
@@ -783,14 +815,16 @@ if __name__ == "__main__":
     
     volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
     volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
+    
+    # Uniform dilation
     volumeDilated = dilateVolumeSphereUniform(np.logical_or(volumeEdges,volumeFaces), dilationRadius)
     # volumeDilated = dilateVolumeSphereUniform(volumeEdges, dilationRadius)
     
     # Testing code for drawFaces
-    faceVertexInd = uniqueFacesRetain
-    vertices = vor.vertices
-    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
-    verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
+    # faceVertexInd = uniqueFacesRetain
+    # vertices = vor.vertices
+    # volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    # verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
     
     # Visualize all edges
     # fig = plt.figure()
