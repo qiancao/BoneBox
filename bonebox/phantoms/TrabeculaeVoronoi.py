@@ -741,9 +741,7 @@ def thicknessOrientationDisributionFunctionKinney(theta, phi):
     None.
 
     """
-    
-    
-    
+
     return None
     
 def massOrientationDistributionFunctionKinney(theta, phi):
@@ -757,6 +755,8 @@ def massOrientationDistributionFunctionKinney(theta, phi):
     None.
 
     """
+    
+    return None
 
 # def dilateVolumeSphereRosconi(volume, voxelSize, alpha=1.71e11, beta=8.17, gamma=55.54):
 #     # Dilate trabecular structure based on poisson distribution

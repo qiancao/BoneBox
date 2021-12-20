@@ -24,7 +24,7 @@ jimage = ij.py.to_java(npimage)
 ij.ui().showUI()
 ij.ui().show(jimage)
 
-# result = ij.py.run_plugin("Thickness")
+result = ij.py.run_plugin("Thickness")
 # outputs = result.getOutputs()
 
 # ijop = ij.op()

@@ -351,6 +351,7 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     material = chrono.fea.ChContinuumElastic(elasticModulus, poissonRatio)
     mesh = fea.ChMesh()
 
+    # TODO: is it necessary to add nodes to mesh?
     node_list = []
     for ind in range(nodes.shape[0]):
         node_list.append(fea.ChNodeFEAxyz(chrono.ChVectorD(nodes[ind,0], nodes[ind,1], nodes[ind,2])))
@@ -401,13 +402,6 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         constr_list_moving.append(fea.ChLinkPointFrame())
         constr_list_moving[-1].Initialize(node_list[ind],truss_moving)
         system.Add(constr_list_moving[-1])
-        
-    # Create constraint for face A (allow displacement in Z only)
-    # chrono.ChLinkMateGeneric() didn't seem to work
-    # constr_A = chrono.ChLinkMateGeneric()
-    # constr_A.Initialize(truss_moving, truss, chrono.ChFrameD())
-    # constr_A.SetConstrainedCoords(True, True, False, True, True, True)
-    # system.AddLink(constr_A)
     
     # Prismatic Joint, this works for Paradiso MKL solver
     constr_A = chrono.ChLinkLockPrismatic()
