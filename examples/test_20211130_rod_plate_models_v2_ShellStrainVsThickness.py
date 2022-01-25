@@ -201,8 +201,8 @@ def computeFEARodPlateLinear(vertices, edges, faces,
     for ind, element in enumerate(elementsShellList):
         Fi = chrono.ChVectorDynamicD(element.GetNdofs())
         element.ComputeInternalForces(Fi)
-        strainsShell[ind,:] = [element.m.x, element.m.y, element.m.z,
-                               element.n.x, element.n.y, element.n.z]
+        strainsShell[ind,:] = [element.m.x, element.m.y, element.m.z, # bending
+                               element.n.x, element.n.y, element.n.z] # stretching
         
     # Save Bar Element Strains
     strainsBar = np.zeros(edges.shape[0],dtype=np.double)
@@ -217,7 +217,7 @@ if __name__ == "__main__":
     
     plt.close("all")
     
-    d0s = np.linspace(10e-6,1000e-6,200) # This is now thickness of shell elements
+    d0s = np.linspace(1e-6,1000e-6,200) # This is now thickness of shell elements
     barStrain = np.zeros(d0s.shape)
     shellStrain = np.zeros((d0s.shape[0],6))
    
@@ -236,9 +236,9 @@ if __name__ == "__main__":
         verticesFixed = np.array([0,1],dtype=np.uint64)
         
         # Material Properties
-        elasticModulus = 17e9 # Pa
+        elasticModulus = 17e9 # N/m**2
         poissonRatio = 0.3
-        density = 0.1
+        density = 1.6e3 # [1.6-2 g/cm**3] not used
         barAreas = np.pi*100e-6**2*np.ones(edges.shape[0],dtype=float) # m**2 = PI*r**2
         shellThicknesses = d0*np.ones(faces.shape[0],dtype=float) # m
         
@@ -249,18 +249,15 @@ if __name__ == "__main__":
         
         # barStrain[sind] = strainsBar[0]
         shellStrain[sind,:] = strainsShell.flatten()
-        
-    #%%
-    
-    # fig = plt.figure()
-    # plt.plot(d0s, barStrain)
-    # plt.xlabel("Shell Thickness")
-    # plt.ylabel("Rod Strain")
     
     #%%
+    
+    legend = ["mx",'my','mz','nx','ny','nz']
     
     fig = plt.figure()
-    plt.plot(d0s, shellStrain)
+    for ind in range(6):
+        plt.plot(d0s, shellStrain[:,ind])
+    plt.legend(legend)
     plt.xlabel("Shell Thickness")
     plt.ylabel("Plate Strain")
-    
+    plt.yscale("log")

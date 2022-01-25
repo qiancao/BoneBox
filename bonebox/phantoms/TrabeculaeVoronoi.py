@@ -19,6 +19,9 @@ from skimage.draw import line_nd
 import scipy
 from scipy.ndimage import binary_dilation
 
+# distributions for seeding and perturbations
+from scipy.stats import multivariate_normal
+
 # import raster_geometry as rg
 
 # import utils
@@ -222,6 +225,35 @@ def perturbSeedPointsCartesianUniformXYZ(points, Rxyz, dist="sphere", randState=
     
     return ppoints
 
+def perturbSeedPointsEllipsoidUniformXYZ(points, Rxyz, randState=None):
+    """
+    https://stackoverflow.com/questions/24513304/uniform-sampling-from-a-ellipsoidal-confidence-region
+    
+    """
+    
+    pass
+    
+    # # Perturb points in XY
+    # ppoints = points    # Perturb points in XY
+    #     ppoints = points + Pxyz
+    
+    # return ppoints
+
+
+def perturbSeedPointsGaussianXYZ(points, sigmaXYZ, randState=None):
+    
+    # Number of points
+    Np = points.shape[0]
+    
+    # Generate Gaussian perturbation
+    covariance = np.diag(sigmaXYZ**2)
+    Pxyz = np.random.multivariate_normal(mean=(0,0,0), cov=covariance, random_state = randState)
+    
+    # Perturb points in XY
+    ppoints = points + Pxyz
+    
+    return ppoints
+    
 def applyVoronoi(ppoints, Sxyz):
     """
     Apply Voronoi Tessellation to (perturbed) points, and compute index of 
@@ -693,6 +725,8 @@ def dilateVolumeSphereUniform(volume, radius):
 def cdfRosconi(cdfThickness=np.linspace(0,1,1000), 
                alpha=1.71e11, beta=8.17, gamma=55.54):
     """
+    TODO: Not Yet Implemented
+    
     * Input to this function has units of mm for default parameters.
     ** Default values of alpha, beta and gamma derived from:
        Rosconi et al. Quantitative approach to the stochastics of bone remodeling. 2012.
@@ -712,6 +746,8 @@ def cdfRosconi(cdfThickness=np.linspace(0,1,1000),
 
 def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
     """
+    TODO: Not Yet Implemented
+    
     Sample from a Rosconi distribution.
     Random state of uniform variable generator defined by randState
     
@@ -729,6 +765,8 @@ def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
 
 def thicknessOrientationDisributionFunctionKinney(theta, phi):
     """
+    TODO: Not Yet Implemented
+    
     Returns mean trabecular thickness per orientation.
     
     Kinney et al. An orientation distribution function for trabecular bone.
@@ -746,6 +784,8 @@ def thicknessOrientationDisributionFunctionKinney(theta, phi):
     
 def massOrientationDistributionFunctionKinney(theta, phi):
     """
+    TODO: Not Yet Implemented
+    
     Compute relative mass of trabeculae given orientation.
     
     Kinney et al. An orientation distribution function for trabecular bone.
@@ -803,7 +843,7 @@ if __name__ == "__main__":
     faceVertices = getFaceVertices(vor.vertices, uniqueFaces)
     faceAreas = computeFaceAreas(faceVertices)
     faceCentroids = computeFaceCentroids(faceVertices)
-    faceNormas = computeFaceNormals(faceVertices)
+    faceNormals = computeFaceNormals(faceVertices)
     
     # Filter random edges and faces
     uniqueEdgesRetain, edgesRetainInd = filterEdgesRandomUniform(uniqueEdges, 

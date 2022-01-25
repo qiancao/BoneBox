@@ -76,6 +76,7 @@ def computeFEARodPlateLinear(vertices, edges, faces,
     # Indices should always be np.uint64
     asUint64 = lambda x: x.astype(np.uint64)
     asDouble = lambda x: x.astype(np.double)
+    vec2arr = lambda vec: np.array([vec.x, vec.y, vec.z])
     
     # Convert boolean arrays to node indices
     vertices, edges, faces = asDouble(vertices), asUint64(edges), asUint64(faces)
@@ -195,12 +196,13 @@ def computeFEARodPlateLinear(vertices, edges, faces,
         vertices1[ind,2] = pos.z
     
     # Save Shell Element Strains
-    strainsShell = np.zeros((faces.shape[0],6), dtype=np.double) # [m (bending), n(stretching)]
+    strainsShell = np.zeros((faces.shape[0],3), dtype=np.double) # [m (bending), n(stretching)]
     for ind, element in enumerate(elementsShellList):
         Fi = chrono.ChVectorDynamicD(element.GetNdofs())
         element.ComputeInternalForces(Fi)
-        strainsShell[ind,:] = [element.m.x, element.m.y, element.m.z,
-                               element.n.x, element.n.y, element.n.z]
+        strainsShell[ind,:] = vec2arr(element.e)
+        # strainsShell[ind,:] = [element.m.x, element.m.y, element.m.z,
+        #                        element.n.x, element.n.y, element.n.z]
         
     # Save Bar Element Strains
     strainsBar = np.zeros(edges.shape[0],dtype=np.double)
@@ -241,6 +243,7 @@ if __name__ == "__main__":
     
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
     import matplotlib.pyplot as plt
+    plt.close("all")
     
     #%% Faces and Edges
     fig = plt.figure()
@@ -334,7 +337,7 @@ if __name__ == "__main__":
         xdata, ydata, zdata = vs[:,0], vs[:,1], vs[:,2]
         ax.plot3D(xdata, ydata, zdata, 'k-', linewidth=7)
         
-    plt.close("all")
+    # plt.close("all")
     
     #%%
     
@@ -373,7 +376,7 @@ if __name__ == "__main__":
         
         barStrain[sind] = strainsBar[0]
         # shellStrain[sind] = np.max(np.abs(strainsShell))
-        shellStrain[sind] = np.mean(np.abs(strainsShell[:,5]))
+        shellStrain[sind] = np.max(np.abs(strainsShell))
         
     #%%
     
