@@ -678,7 +678,7 @@ def makeSkeletonVolume(vertices, edgeInds, faceInds,
     
     return volume
 
-def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
+def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels, values=None):
     # Converts vertex list, edge vertex index and face vertex index to volume.
     # This function only assigns voxels from edges.
     
@@ -694,9 +694,10 @@ def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels):
     
     return volume
 
-def makeSkeletonVolumeFaces(vertices, faceInds, voxelSize, volumeSizeVoxels):
+def makeSkeletonVolumeFaces(vertices, faceInds, voxelSize, volumeSizeVoxels, values=None):
     # invoke drawFace
     # vertices: all vertices from vor.vertices
+    # scalars 
     
     volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
     

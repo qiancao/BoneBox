@@ -511,6 +511,42 @@ def renderFEA(imgName, strainsBar, strainsShell4Face, v, verticesForce, vertices
     
     # print(plotter.camera_position)
    
+# def plates2image(vertices, faces, thicknesses , dims, spacing):
+#     """
+    
+#     thicknesses: radii of plates in voxels, same len as faces
+#     dims: number of voxels in xyz
+#     spacing: voxel size
+    
+#     """
+    
+#     image = np.zeros(dims, dtype=np.uint8)
+    
+#     for ind, face in enumerate(faces):
+        
+#         full_surface(verts)
+        
+#         # print(f"{ind}/{len(faces)}")
+        
+#         # grid = pv.UniformGrid(
+#         #     dims = np.array(dims),
+#         #     spacing = np.array(spacing),
+#         #     origin = -(np.array(dims)*np.array(spacing))/2,
+#         # )
+        
+#         # mesh = pv.PolyData(vertices, padPolyData([face]))
+        
+#         # grid_dist = grid.compute_implicit_distance(mesh)
+        
+#         # dist = grid_dist.point_data['implicit_distance']
+#         # dist = np.array(dist).reshape(dims)
+        
+#         # dist = (np.abs(dist) < thicknesses[ind]).astype(np.uint8)
+    
+#         # image = np.maximum(image, dist)
+        
+#     return image
+   
 if __name__ == "__main__":
     
     import matplotlib.pyplot as plt
@@ -613,6 +649,18 @@ if __name__ == "__main__":
             # Random State
             displacementRands.append(displacement)
             strainsRands.append(np.median(strainsShell4Face))
+            
+            # Convert to volume
+            dims = (250,250,250)
+            spacing = np.array(Sxyz) / np.array(dims)
+            
+            thicknessVoxels = (shellThicknesses/thicknessScaling) / spacing[0]
+            print(thicknessVoxels)
+            
+            # image = plates2image(vertices, faces, (thicknessVoxels,)*len(faces), dims, spacing)
+            
+            
+            assert False
             
             # assert False
         
