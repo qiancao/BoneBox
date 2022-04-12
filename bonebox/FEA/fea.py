@@ -23,21 +23,41 @@ import pychrono as chrono
 import pychrono.fea as fea
 import pychrono.pardisomkl as mkl
 
-def addPlatten(volume, plattenThicknessVoxels):
+def addPlatten(volume, plattenThicknessVoxels, plattenValue=None, airValue=None, trimVoxels=0):
     # adds compression plates in Z
     # leaves a single-voxel space at the edge of volume (for isosurface)
     
     vmax = np.max(volume)
     vmin = np.min(volume)
     
+    if plattenValue == None:
+        plattenValue = vmax
+        
+    if airValue == None:
+        airValue = vmin
+    
     # Leaves single-voxel space at edge of volume for isosurface ops
-    volume[:,:,0] = vmin
-    volume[:,:,-1] = vmin
+    volume[:,:,0] = airValue
+    volume[:,:,-1] = airValue
     
     # Define platten
-    volume[1:-1,1:-1,1:plattenThicknessVoxels] = vmax
-    volume[1:-1,1:-1,-plattenThicknessVoxels:-1] = vmax
+    volume[(1+trimVoxels):(-1-trimVoxels),(1+trimVoxels):(-1-trimVoxels),1:plattenThicknessVoxels] = plattenValue
+    volume[(1+trimVoxels):(-1-trimVoxels),(1+trimVoxels):(-1-trimVoxels),-plattenThicknessVoxels:-1] = plattenValue
 
+    return volume
+
+def set_volume_bounds(volume, airValue=None):
+    
+    if airValue is None:
+        airValue = np.min(volume)
+        
+    volume[0,:,:] = airValue
+    volume[-1,:,:] = airValue
+    volume[:,0,:] = airValue
+    volume[:,-1,:] = airValue
+    volume[:,:,0] = airValue
+    volume[:,:,-1] = airValue
+    
     return volume
 
 def Voxel2HexaMeshIndexCoord(volume):
@@ -170,9 +190,13 @@ def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size
     if level == None:
         level = (np.max(volume))/2
     
+    # vertices, faces, normals, values = \
+    #     measure.marching_cubes_lewiner(volume = volume, level = level, spacing = voxelSize, \
+    #                                    step_size = step_size, allow_degenerate = allow_degenerate)
     vertices, faces, normals, values = \
-        measure.marching_cubes_lewiner(volume = volume, level = level, spacing = voxelSize, \
-                                       step_size = step_size, allow_degenerate = allow_degenerate)
+        measure.marching_cubes(volume = volume, level = level, spacing = voxelSize, \
+                               step_size = step_size, allow_degenerate = allow_degenerate)
+            
     return vertices, faces, normals, values
 
 def Surf2TetMesh(vertices, faces, order=1, verbose=1):
@@ -360,7 +384,7 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     ele_list = []
     for ind in range(elements.shape[0]):
         node0ind, node1ind, node2ind, node3ind = elements[ind,0], elements[ind,1], elements[ind,2], elements[ind,3]
-        ele_list.append(fea.ChElementTetra_4())
+        ele_list.append(fea.ChElementTetraCorot_4())
         ele_list[ind].SetNodes(node_list[node0ind], node_list[node1ind], node_list[node2ind], node_list[node3ind])
         ele_list[ind].SetMaterial(material)
         mesh.AddElement(ele_list[ind]) # use 0-based indexing here

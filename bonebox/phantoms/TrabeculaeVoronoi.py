@@ -569,7 +569,12 @@ def convertAbs2Array(vertices, voxelSize, volumeSizeVoxels):
     # convert absolute coordinates (e.g. in mm) to array coordinates (array indices)
     # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
     
-    voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
+    if type(voxelSize) is tuple:
+        voxelSize = np.array(voxelSize)
+        
+    if type(volumeSizeVoxels) is tuple:
+        volumeSizeVoxels = np.array(volumeSizeVoxels)
+        
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
     
     # Note, array coordinates start at 0.5
@@ -581,7 +586,12 @@ def convertArray2Abs(vertices, voxelSize, volumeSizeVoxels):
     # convert array coordinates to absolute coordinates
     # In absolute coordinates, origin is in the center, in array coordinates, origin is at "top left" corner.
     
-    voxelSize, volumeSizeVoxels= np.array(voxelSize), np.array(volumeSizeVoxels)
+    if type(voxelSize) is tuple:
+        voxelSize = np.array(voxelSize)
+        
+    if type(volumeSizeVoxels) is tuple:
+        volumeSizeVoxels = np.array(volumeSizeVoxels)
+        
     shiftOriginToCorner = voxelSize * volumeSizeVoxels / 2
     
     # Note, array coordinates start at 0.5
@@ -589,7 +599,7 @@ def convertArray2Abs(vertices, voxelSize, volumeSizeVoxels):
     
     return verticesAbs
 
-def drawLine(volume, vertices, edgeVertexInd):
+def drawLine(volume, vertices, edgeVertexInd, value):
     # Vertices should be in array coordinates (corner origin, unit = voxels)
     
     start = vertices[edgeVertexInd[0],:]
@@ -597,7 +607,7 @@ def drawLine(volume, vertices, edgeVertexInd):
     
     lin = line_nd(start, end, endpoint = True)
 
-    volume[lin] = 1
+    volume[lin] = value
     
 def flood_fill_hull(image):
     # This is depricated TODO: remove
@@ -651,30 +661,39 @@ def full_surface(verts):
     
     return surf
 
-def drawFace(volume, verticesArray, faceVertexInd):
+def drawFaces(volume, verticesArray, faceVertexInd, values=None): # TODO: Test this augmented version
     # Draws multiple faces
     # Vertices should be in array coordinates (corner origin, unit = voxels)
     
-    for faceInd in range(len(faceVertexInd)):
-        faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
-        surf = full_surface(faceVerts)
-        surf = tuple(np.array(list(surf)).T) # convert from set of points to tuple of XYZ coordinates
-        volume[surf] = 1
+    if values is None: # create binary volume
+        for faceInd in range(len(faceVertexInd)):
+            print(f"{faceInd}/{len(faceVertexInd)}")
+            faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
+            surf = full_surface(faceVerts)
+            surf = tuple(np.array(list(surf)).T) # convert from set of points to tuple of XYZ coordinates
+            volume[surf] = 1
+            
+        volume = (volume>0).astype(np.uint8) # TODO: this might not be necessary
         
-    volume = (volume>0).astype(int)
-    
+    else: # create volume with volumes assigned
+        for faceInd in range(len(faceVertexInd)):
+            print(f"{faceInd}/{len(faceVertexInd)}")
+            faceVerts = verticesArray[faceVertexInd[faceInd],:].astype(int)
+            surf = full_surface(faceVerts)
+            surf = tuple(np.array(list(surf)).T) # convert from set of points to tuple of XYZ coordinates
+            volume[surf] = np.maximum(volume[surf],values[faceInd])
+            
     return volume
 
-def makeSkeletonVolume(vertices, edgeInds, faceInds, 
-                       voxelSize, volumeSizeVoxels):
+def makeSkeletonVolume(vertices, edgeInds, faceInds, voxelSize, volumeSizeVoxels):
     # Converts vertex list, edge vertex index and face vertex index to volume.
     
-    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    volume = np.zeros(volumeSizeVoxels, dtype=np.uint8)
     
     # Convert vertices to array-coordinates
     verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
     
-    # TODO finish this off here
+    # TODO: finish wrapper class for makeSkeletonVolumeEdgesAndFaces
     
     return volume
 
@@ -682,30 +701,42 @@ def makeSkeletonVolumeEdges(vertices, edgeInds, voxelSize, volumeSizeVoxels, val
     # Converts vertex list, edge vertex index and face vertex index to volume.
     # This function only assigns voxels from edges.
     
-    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    if values is None: # Create a binary volume
+        volume = np.zeros(volumeSizeVoxels, dtype=np.uint8)
+    else: # Create a volume with the same type as values
+        volume = np.zeros(volumeSizeVoxels, dtype=values.dtype)
     
     # Convert vertices to array-coordinates
     verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
     
     edgeInds = np.array(edgeInds)
     
-    for ii in range(edgeInds.shape[0]):
-        drawLine(volume, verticesArray, edgeInds[ii,:])
+    if values is None:
+        for ii in range(edgeInds.shape[0]):
+            drawLine(volume, verticesArray, edgeInds[ii,:], 1)
+    else:
+        for ii in range(edgeInds.shape[0]):
+            drawLine(volume, verticesArray, edgeInds[ii,:], values[ii])
     
     return volume
 
 def makeSkeletonVolumeFaces(vertices, faceInds, voxelSize, volumeSizeVoxels, values=None):
     # invoke drawFace
     # vertices: all vertices from vor.vertices
-    # scalars 
+    # adding values argument to drawFace, values must be none or have same len as faceInds
     
-    volume = np.zeros(volumeSizeVoxels, dtype=np.uint16)
+    if values is None: # Create a binary volume
+        volume = np.zeros(volumeSizeVoxels, dtype=np.uint8)
+    else: # Create a volume with the same type as values
+        volume = np.zeros(volumeSizeVoxels, dtype=values.dtype)
+        
+    print(volume.shape)
     
     # Convert vertices to array-coordinates
     verticesArray = convertAbs2Array(vertices, voxelSize, volumeSizeVoxels)
     
     # invoke drawFace
-    drawFace(volume, verticesArray, faceInds)
+    drawFaces(volume, verticesArray, faceInds, values)
     
     return volume
 

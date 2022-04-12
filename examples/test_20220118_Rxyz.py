@@ -14,6 +14,8 @@ Useful links:
     
 Modified from: test_20220105_rod_plate_models_v4_plates_displacement_vs_thickness.py
 
+Based on test_20200118_Rxyz.py
+
 """
 
 # the usual suspects
@@ -511,41 +513,39 @@ def renderFEA(imgName, strainsBar, strainsShell4Face, v, verticesForce, vertices
     
     # print(plotter.camera_position)
    
-# def plates2image(vertices, faces, thicknesses , dims, spacing):
-#     """
+def plates2image(vertices, faces, thicknesses , dims, spacing):
+    """
     
-#     thicknesses: radii of plates in voxels, same len as faces
-#     dims: number of voxels in xyz
-#     spacing: voxel size
+    thicknesses: radii of plates in voxels, same len as faces
+    dims: number of voxels in xyz
+    spacing: voxel size
     
-#     """
+    """
+
+    image = np.zeros(dims, dtype=np.uint8)
     
-#     image = np.zeros(dims, dtype=np.uint8)
+    for ind, face in enumerate(faces):
+        
+        print(f"{ind}/{len(faces)}")
+        
+        grid = pv.UniformGrid(
+            dims = np.array(dims),
+            spacing = np.array(spacing),
+            origin = -(np.array(dims)*np.array(spacing))/2,
+        )
+        
+        mesh = pv.PolyData(vertices, padPolyData([face]))
+        
+        grid_dist = grid.compute_implicit_distance(mesh)
+        
+        dist = grid_dist.point_data['implicit_distance']
+        dist = np.array(dist).reshape(dims)
+        
+        dist = (np.abs(dist) < thicknesses[ind]).astype(np.uint8)
     
-#     for ind, face in enumerate(faces):
+        image = np.maximum(image, dist)
         
-#         full_surface(verts)
-        
-#         # print(f"{ind}/{len(faces)}")
-        
-#         # grid = pv.UniformGrid(
-#         #     dims = np.array(dims),
-#         #     spacing = np.array(spacing),
-#         #     origin = -(np.array(dims)*np.array(spacing))/2,
-#         # )
-        
-#         # mesh = pv.PolyData(vertices, padPolyData([face]))
-        
-#         # grid_dist = grid.compute_implicit_distance(mesh)
-        
-#         # dist = grid_dist.point_data['implicit_distance']
-#         # dist = np.array(dist).reshape(dims)
-        
-#         # dist = (np.abs(dist) < thicknesses[ind]).astype(np.uint8)
-    
-#         # image = np.maximum(image, dist)
-        
-#     return image
+    return image
    
 if __name__ == "__main__":
     
@@ -641,9 +641,12 @@ if __name__ == "__main__":
                 strainsShellQuadCombined.append(np.mean(strainsShellQuad[faceGroupArr == g]))
             strainsShell4Face = np.array(strainsShellQuadCombined)
             
+            tanh = lambda x: np.tanh(x)
+            faceOpacity = tanh(strainsShell4Face/np.median(strainsShell4Face))
+            
             # Render volume
             renderFEA(outDir+f"fea_{vv}_{rr}.png", strainsBar, strainsShell4Face, v, verticesForce, verticesFixed)
-        
+            
             displacement = np.mean(linalg.norm(verticesFE1[verticesForce,:] - verticesFE[verticesForce,:],axis=1))
             
             # Random State
@@ -657,12 +660,12 @@ if __name__ == "__main__":
             thicknessVoxels = (shellThicknesses/thicknessScaling) / spacing[0]
             print(thicknessVoxels)
             
-            # image = plates2image(vertices, faces, (thicknessVoxels,)*len(faces), dims, spacing)
+            # assert False
             
+            image = plates2image(vertices, faces, (thicknessVoxels,)*len(faces), dims, spacing)
+            # volume = makeSkeletonVolumeFaces(vertices, faces, spacing, dims, values=None)
             
             assert False
-            
-            # assert False
         
         displacements.append(displacementRands)
         strains.append(strainsRands)
