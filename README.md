@@ -2,6 +2,21 @@
 
 Tools for bone modeling, evaluation and biomarker development.
 
+### Install Dependencies
+
+Clone the repository
+'''
+git clone https://github.com/qiancao/BoneBox.git
+cd BoneBox
+'''
+
+Create a new conda environment
+'''
+conda update --all
+conda env create -f environment_bonebox.yml
+conda activate bonebox
+'''
+
 ### Example: Generating a simple Voronoi-based Trabecular Model
 
 ```
