@@ -1,0 +1,41 @@
+# conda update --all
+# conda env create -f environment_bonebox.yml
+# conda env remove -n main
+
+name: bonebox
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - numpy
+  - scipy
+  - numba
+  - mkl
+  - matplotlib
+  - scikit-image
+  - scikit-learn
+  - spyder
+  - ipython
+  - glob2
+  - projectchrono::pychrono
+  - pip
+  - pip:
+    - pynrrd # image/data file formats
+    - pydicom
+    - h5py
+    - nibabel
+    - meshio # mesh formats
+    - trimesh
+    - tetgen
+    - vtk
+    - pyvista
+    - pyvistaqt
+    - pyradiomics # radiomics
+    - umap-learn # ML
+    - edt # Euclidean Distance Transform and Skeletal Analysis (3D-capable)
+    - skan
+    - cvxopt # convex optimization
+    - cupy-cuda112
+    - torch
+    - torchvision
+    - torchaudio
