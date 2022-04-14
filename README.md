@@ -5,10 +5,10 @@ Tools for bone modeling, evaluation and biomarker development.
 ### Install Dependencies
 
 Clone the repository
-'''
+```
 git clone https://github.com/qiancao/BoneBox.git
 cd BoneBox
-'''
+```
 
 Create a new conda environment
 '''
