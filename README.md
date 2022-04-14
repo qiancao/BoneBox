@@ -12,7 +12,6 @@ cd BoneBox
 
 Create a new conda environment
 ```
-conda update --all
 conda env create -f environment_bonebox.yml
 conda activate bonebox
 ```
