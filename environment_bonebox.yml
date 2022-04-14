@@ -35,7 +35,7 @@ dependencies:
     - edt # Euclidean Distance Transform and Skeletal Analysis (3D-capable)
     - skan
     - cvxopt # convex optimization
-    - cupy-cuda112
-    - torch
-    - torchvision
-    - torchaudio
+    #- cupy-cuda112
+    #- torch
+    #- torchvision
+    #- torchaudio
