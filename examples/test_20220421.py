@@ -133,15 +133,21 @@ def makeNPSRamp(freqs,alpha=1):
     cone = alpha * np.sqrt(xxx**2+yyy**2)
     return cone
 
-def integrateNPS(NPS,freqs):
-    df = 1 # frequency domain voxel volume
+def dF(freqs):
+    # Get frequency domain bin size from frequency vectors.
+    df = 1
     for ind, f in enumerate(freqs):
         df = df * np.abs(f[1]-f[0]) # integrate noise power
+    return df
+
+def integrateNPS(NPS,freqs):
+    # Riemann integral over frequency domain
+    df = dF(freqs)
     return np.sum(NPS) * df
 
 if __name__ == "__main__":
     
-    outDir = "/data/BoneBox-out/test_20220421/"
+    outDir = "../../BoneBox-out/test_20220421/"
     os.makedirs(outDir,exist_ok=True)
     
     plt.close("all")
@@ -183,8 +189,8 @@ if __name__ == "__main__":
     
     print(np.std(noiseS))
     
-    print(np.sum(np.abs(noiseS**2)))
-    print(np.sum(np.abs(S**2)))
+    print(np.sum(np.abs(noiseS**2))*np.prod(voxSize))
+    print(np.sum(np.abs(S**2))*dF(freqs)/np.prod(roi.shape))
     
     #%% Preview MTF and NPS
     
