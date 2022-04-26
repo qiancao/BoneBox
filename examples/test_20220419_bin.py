@@ -8,6 +8,7 @@ import numpy as np
 import os, sys
 from scipy import ndimage
 import matplotlib.pyplot as plt
+import os
 
 def computeNPS(rois,voxSize):
     """
@@ -57,14 +58,24 @@ def applyMTF(image, MTF):
     
     return image_filtered
 
-def applySampling(image, voxSize, zoom):
-    # binSize
+def applySampling(image, voxSize, voxSizeNew):
+    # TODO: check on use of histogramdd
     
-    # newDims = (image.shape * np.array(voxSize) // np.array(binSize)).astype(int)
-    # zoom = np.array(binSize) / np.array(voxSize)
-    # TODO: transition to binning using histogramdd
+    dimsNew = (image.shape * np.array(voxSize) // np.array(voxSizeNew)).astype(int)
+    
+    shape = image.shape
+    # xxx,yyy,zzz = np.meshgrid(np.arange(shape[0]),np.arange(shape[1]),np.arange(shape[2]))
+    # TODO: think about how to do this properly
+    x,y,z = np.meshgrid(np.linspace(0,shape[0],dimsNew[0]).astype(int),
+                                 np.linspace(0,shape[1],dimsNew[1]).astype(int),
+                                 np.linspace(0,shape[2],dimsNew[2]).astype(int))
 
-    return ndimage.zoom(image, zoom, order=3, prefilter=True)
+    imageNew = ndimage.map_coordinates(image, [x.flatten(), y.flatten(), z.flatten()])
+    
+    imageNew = np.reshape(imageNew,dimsNew)
+    
+    # return ndimage.zoom(image, zoom, prefilter=False)
+    return imageNew
 
 def noisePoisson(size,plambda=1000,seed=None):
     rng = np.random.default_rng(seed)
@@ -123,34 +134,44 @@ def makeNPSRamp(freqs,alpha=1):
     return cone
 
 def integrateNPS(NPS,freqs):
-    
     df = 1
     for ind, f in enumerate(freqs):
-        df = df * np.abs(f[1]-f[0])
-    
+        df = df * np.abs(f[1]-f[0]) # integrate noise power
     return np.sum(NPS) * df
 
 if __name__ == "__main__":
     
-    outDir = "/data/BoneBox-out/test_20220419/"
+    outDir = "/data/BoneBox-out/test_20220419_bin/"
+    os.makedirs(outDir,exist_ok=True)
     
     plt.close("all")
     
     voxSize = (0.05, 0.05, 0.05) # mm
-    boneHU = 400 # HU
+    voxSizeNew = (0.156,0.156,0.2) # mm
+    boneHU = 1800 # HU
     
-    noise_std = 250
+    noise_std = 180
     
-    stdMTF = [1,1,0.5]
+    stdMTF = [1.8,1.8,0.5]
     
     filenameNRRD = "../data/rois/isodata_04216_roi_4.nrrd"
     roi, header = nrrd.read(filenameNRRD)
+    
+    roi0 = roi
+    roi0 = (roi0 - np.min(roi0)) / (np.max(roi0) - np.min(roi0))
+    roi0 = roi0 * boneHU
+    
+    # binning
+    roi = applySampling(roi, voxSize, voxSizeNew)
+    voxSize = voxSizeNew
     
     # normalize to 0 and 1, scale to bone HU
     roi = (roi - np.min(roi)) / (np.max(roi) - np.min(roi))
     roi = roi * boneHU
     
-    freqs = getFreqs(roi.shape,voxSize)
+    # get frequency axis
+    freqs = getFreqs(roi.shape,voxSizeNew)
+    
     T = make3DMTFGaussian(freqs,stdMTF)
     roiT = applyMTF(roi,T)
     
@@ -164,9 +185,13 @@ if __name__ == "__main__":
     
     noiseS = NPS2noise(S,seed=None) * (noise_std**2)
     
+    print(np.std(noiseS))
+    
     # noiseS = ndimage.gaussian_filter(noise,5) * noise_std
     
     #%% Preview MTF and NPS
+    
+    sh = roi.shape
     
     # coneshift = np.fft.fftshift(cone)
     Tshift = np.fft.fftshift(T)
@@ -180,23 +205,23 @@ if __name__ == "__main__":
               np.min(freqs[2]), np.max(freqs[2])]
     
     fig, ax = plt.subplots(2,2,figsize=(12,10))
-    img = ax[0,0].imshow(Tshift[:,:,101],cmap="viridis",extent=axlims[0:4])
+    img = ax[0,0].imshow(Tshift[:,:,sh[2]//2],cmap="viridis",extent=axlims[0:4])
     ax[0,0].set_xlabel("X (1/mm)")
     ax[0,0].set_ylabel("Y (1/mm)")
     cbar = fig.colorbar(img, ax=ax[0,0])
  
-    img = ax[1,0].imshow(Tshift[:,101,:].T,cmap="viridis",extent=[np.min(freqs[0]), np.max(freqs[0]),np.min(freqs[2]), np.max(freqs[2])])
+    img = ax[1,0].imshow(Tshift[:,sh[1]//2,:].T,cmap="viridis",extent=[np.min(freqs[0]), np.max(freqs[0]),np.min(freqs[2]), np.max(freqs[2])])
     ax[1,0].set_xlabel("X (1/mm)")
     ax[1,0].set_ylabel("Z (1/mm)")
     cbar = fig.colorbar(img, ax=ax[1,0])
     
-    img = ax[0,1].imshow(Sshift[:,:,101],cmap="gnuplot2",extent=axlims[0:4])
+    img = ax[0,1].imshow(Sshift[:,:,sh[2]//2],cmap="gnuplot2",extent=axlims[0:4])
     ax[0,1].set_xlabel("X (1/mm)")
     ax[0,1].set_ylabel("Y (1/mm)")
     cbar = fig.colorbar(img, ax=ax[0,1])
     cbar.set_label('HU^2 mm^3', rotation=90)
     
-    img = ax[1,1].imshow(Sshift[:,101,:].T,cmap="gnuplot2",extent=[np.min(freqs[0]), np.max(freqs[0]),np.min(freqs[2]), np.max(freqs[2])])
+    img = ax[1,1].imshow(Sshift[:,sh[1]//2,:].T,cmap="gnuplot2",extent=[np.min(freqs[0]), np.max(freqs[0]),np.min(freqs[2]), np.max(freqs[2])])
     ax[1,1].set_xlabel("X (1/mm)")
     ax[1,1].set_ylabel("Z (1/mm)")
     cbar = fig.colorbar(img, ax=ax[1,1])
@@ -206,14 +231,16 @@ if __name__ == "__main__":
     
     #%% 
     
+    plt.close("all")
+    
     fig, ax = plt.subplots(1,2,figsize=(12,4))
     
-    ax[0].plot(freqx,Tshift[:,100,100],'k')
+    ax[0].plot(freqx,Tshift[:,sh[1]//2,sh[2]//2],'k')
     ax[0].set_xlabel("Freqency (1/mm)")
     ax[0].set_xlim([0,np.max(freqx)])
     ax[0].set_title("In-plane MTF")
     
-    ax[1].plot(freqx,Sshift[:,100,100],'k')
+    ax[1].plot(freqx,Sshift[:,sh[1]//2,sh[2]//2],'k')
     ax[1].set_xlabel("Freqency (1/mm)")
     ax[1].set_ylabel("(HU^2 mm^3)")
     ax[1].set_xlim([0,np.max(freqx)])
@@ -225,46 +252,26 @@ if __name__ == "__main__":
     fig, ax = plt.subplots(2,2,figsize=(12,10))
     
     ax = ax.flatten()
-    img = ax[0].imshow(roi[:,:,101],cmap="gray")
+    img = ax[0].imshow(roi0[:,:,roi0.shape[2]//2],cmap="gray",vmin=700-3800/2,vmax=700+3800/2)
     ax[0].set_axis_off()
     cbar = fig.colorbar(img, ax=ax[0])
     cbar.set_label('HU', rotation=90)
     
-    img = ax[1].imshow(roiT[:,:,101],cmap="gray")
+    img = ax[1].imshow(roiT[:,:,sh[2]//2],cmap="gray",vmin=700-3800/2,vmax=700+3800/2)
     ax[1].set_axis_off()
     cbar = fig.colorbar(img, ax=ax[1])
     cbar.set_label('HU', rotation=90)
     
-    img = ax[2].imshow(noiseS[:,:,101],cmap="gray")
+    img = ax[2].imshow(noiseS[:,:,sh[2]//2],cmap="gray",vmin=700-3800/2,vmax=700+3800/2)
     ax[2].set_axis_off()
     cbar = fig.colorbar(img, ax=ax[2])
     cbar.set_label('HU', rotation=90)
     
-    img = ax[3].imshow(roi_final[:,:,101],cmap="gray")
+    img = ax[3].imshow(roi_final[:,:,sh[2]//2],cmap="gray",vmin=700-3800/2,vmax=700+3800/2)
     ax[3].set_axis_off()
     cbar = fig.colorbar(img, ax=ax[3])
     cbar.set_label('HU', rotation=90)
     
     plt.savefig(outDir+"simulated images.png")
     
-    plt.close("all")
-
-    # noise_rois = []
-    # for ind in range(100):
-    #     noise = noiseNormal(roi.shape)
-    #     noise_filt = ndimage.gaussian_filter(noise,1)
-    #     noise_rois.append(noise_filt)
-    
-    # NPS, freqs = computeNPS(noise_rois,voxelSize)
-    # NPS0, freqs = computeNPS([noise_rois[0]],voxelSize)
-    
-    # plt.figure()    
-    # plt.close("all")
-    # plt.plot(freqs[0],NPS[:,0,0])
-    # plt.plot(freqs[0],NPS0[:,0,0])
-    
-    # plt.plot(noise_rois[0][:,0,0])
-    # plt.plot(noise_rois[1][:,0,0])
-    
-    
-    
+  
