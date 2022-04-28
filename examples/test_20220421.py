@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 @author: Qian.Cao
+
+Need to fix problems with NPS magnitude
+
 """
 
 import nrrd

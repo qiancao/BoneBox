@@ -141,18 +141,18 @@ def integrateNPS(NPS,freqs):
 
 if __name__ == "__main__":
     
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220419_bin/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220419_bin_MDCT/"
     os.makedirs(outDir,exist_ok=True)
     
     plt.close("all")
     
     voxSize = (0.05, 0.05, 0.05) # mm
-    voxSizeNew = (0.156,0.156,0.2) # mm
+    voxSizeNew = np.array((0.156,0.156,0.2))*2 # mm
     boneHU = 1800 # HU
     
-    noise_std = 180
+    noise_std = 180*0.2
     
-    stdMTF = [1.8,1.8,0.5]
+    stdMTF = np.array([1.8,1.8,0.5])*0.3
     
     filenameNRRD = "../data/rois/isodata_04216_roi_4.nrrd"
     roi, header = nrrd.read(filenameNRRD)

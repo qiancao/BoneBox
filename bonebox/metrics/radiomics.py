@@ -8,36 +8,66 @@
 
 from __future__ import print_function
 
-from collections import OrderedDict
-import csv
-from datetime import datetime
-import logging
-from multiprocessing import cpu_count, Pool
-import os
-import shutil
-import threading
-
+import numpy as np
 import SimpleITK as sitk
-     
-import radiomics
-from radiomics import featureextractor, getFeatureClasses
-from radiomics.featureextractor import RadiomicsFeatureExtractor
+from radiomics import featureextractor
 
-threading.current_thread().name = 'Main'
+def getRadiomicFeatureNames(settings=None):
+    """
+    Generates a list of feature names for computeRadiomicFeatures
 
-# File variables
-ROOT = os.getcwd()
-PARAMS = os.path.join(ROOT, 'exampleSettings', 'Params.yaml')  # Parameter file
-LOG = os.path.join(ROOT, 'log.txt')  # Location of output log file
-INPUTCSV = os.path.join(ROOT, 'testCases.csv')
-OUTPUTCSV = os.path.join(ROOT, 'results.csv')
+    Returns
+    -------
+    featureNames : list of strings
+        features names
 
-# Parallel processing variables
-TEMP_DIR = '_TEMP'
-REMOVE_TEMP_DIR = True  # Remove temporary directory when results have been successfully stored into 1 file
-NUM_OF_WORKERS = cpu_count() - 1  # Number of processors to use, keep one processor free for other work
-if NUM_OF_WORKERS < 1:  # in case only one processor is available, ensure that it is used
-  NUM_OF_WORKERS = 1
-HEADERS = None  # headers of all extracted features
+    """
+    
+    #
+    # TODO: there must a better way of doing this
+    #
+    # see example_match_glcm_20211103
+    
+    # Define settings for signature calculation
+    # These are currently set equal to the respective default values
+    if settings is None:
+        settings = {}
+        settings['binWidth'] = 25
+        settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
+        settings['interpolator'] = sitk.sitkBSpline
+        settings['imageType'] = ['original','wavelet']
+    
+    # Initialize feature extractor
+    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
+    
+    # Extract radiomics from volume
+    volume = np.random.rand(3,3,3)*256
+    volumeSITK = sitk.GetImageFromArray(volume)
+    maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
+    featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
+    # featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
+    featureNames = list(featureVector.keys())
+    
+    return featureNames
 
-out_dir = "/data/BoneBox-out/"
+def computeRadiomicFeatures(volume, settings=None):
+    
+    # Define settings for signature calculation
+    # These are currently set equal to the respective default values
+    if settings is None:
+        settings = {}
+        settings['binWidth'] = 25
+        settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
+        settings['interpolator'] = sitk.sitkBSpline
+        settings['imageType'] = ['original','wavelet']
+    
+    # Initialize feature extractor
+    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
+    
+    # Extract radiomics from volume
+    volumeSITK = sitk.GetImageFromArray(volume)
+    maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
+    featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
+    featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
+    
+    return featureVectorArray

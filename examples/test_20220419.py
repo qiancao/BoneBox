@@ -132,7 +132,7 @@ def integrateNPS(NPS,freqs):
 
 if __name__ == "__main__":
     
-    outDir = "/data/BoneBox-out/test_20220419/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220419/"
     
     plt.close("all")
     

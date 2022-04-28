@@ -147,12 +147,12 @@ if __name__ == "__main__":
     plt.close("all")
     
     voxSize = (0.05, 0.05, 0.05) # mm
-    voxSizeNew = (0.156,0.156,0.2) # mm
+    voxSizeNew = np.array((0.156,0.156,0.2))*0.32 # mm
     boneHU = 1800 # HU
     
-    noise_std = 180
+    noise_std = 180*4
     
-    stdMTF = [1.8,1.8,0.5]
+    stdMTF = np.array([1.8,1.8,0.5])*2
     
     filenameNRRD = "../data/rois/isodata_04216_roi_4.nrrd"
     roi, header = nrrd.read(filenameNRRD)
