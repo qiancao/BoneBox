@@ -48,7 +48,7 @@ def computeNPS(rois,voxSize):
     
     Froi = np.zeros(shape,dtype=np.float64)
     for n, roi in enumerate(rois):
-         Froi = Froi + np.abs(np.fft.fftn(roi, axes=tuple(range(ndim))))
+         Froi = Froi + np.abs(np.fft.fftn(roi, axes=tuple(range(ndim))))**2
     
     # NPS = Froi / N / A
     NPS = np.prod(voxSize) / np.prod(shape) * (Froi / N)

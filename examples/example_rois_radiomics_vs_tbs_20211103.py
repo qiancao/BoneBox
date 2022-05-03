@@ -55,6 +55,8 @@ roi_vm_mean = repeat_ele(np.load(fem_dir+"roi_vm_mean.npy")) # This is mean stre
 roi_bvtv = repeat_ele(np.load(fem_dir+"roi_bvtv.npy")) # This is BVTV
 featuresROI = np.repeat(featuresROI, 2, axis=0)
 
+#%%
+
 # Noramlize features ROI
 featuresROIMean = np.mean(featuresROI, axis=(0))
 featuresROIStd = np.std(featuresROI, axis=(0))
