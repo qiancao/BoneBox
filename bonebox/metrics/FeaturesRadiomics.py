@@ -19,10 +19,17 @@ def getDefaultSettings():
     # See: https://pyradiomics.readthedocs.io/en/latest/customization.html
     
     settings = {}
-    settings['binWidth'] = 25
-    settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
-    settings['interpolator'] = sitk.sitkBSpline
-    settings['imageType'] = ['original']
+    # settings['binWidth'] = 25
+    # settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
+    # settings['interpolator'] = sitk.sitkBSpline
+    # settings['imageType'] = {'Original': []}
+    settings['featureClass'] = {'firstorder': [],
+                                'glcm': [],
+                                'glrlm': [],
+                                'glszm': [],
+                                'gldm': [],
+                                'ngtdm': []} # shape is not included
+    # settings['verbose'] = True
     
     return settings
 
@@ -39,7 +46,7 @@ def getRadiomicFeatureNames(settings=None):
         settings = getDefaultSettings()
     
     # Initialize feature extractor
-    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)
+    extractor = featureextractor.RadiomicsFeatureExtractor(settings)
     
     # Extract radiomics from volume
     volume = np.random.rand(3,3,3)*256
@@ -51,19 +58,21 @@ def getRadiomicFeatureNames(settings=None):
     # featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
     featureVector = extractor.execute(volumeSITK, maskSITK, label=1)
     # featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
-    featureNames = list(featureVector.keys())
+    
+    featureNames = [feat for feat in featureVector if "diagnostics_" not in feat] # TODO: output diagnostics too. remove diagnostic entries, leave only features
+    # featureNames = list(featureVector.keys())
     
     return featureNames
 
 def computeRadiomicFeatures(volume, settings=None):
-    
     # Define settings for signature calculation
     # These are currently set equal to the respective default values
+    
     if settings is None:
         settings = getDefaultSettings()
     
     # Initialize feature extractor
-    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
+    extractor = featureextractor.RadiomicsFeatureExtractor(settings)  
     
     # Extract radiomics from volume
     volumeSITK = sitk.GetImageFromArray(volume)
@@ -73,7 +82,53 @@ def computeRadiomicFeatures(volume, settings=None):
     
     # featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
     featureVector = extractor.execute(volumeSITK, maskSITK)
+    featureVector = {key: value for key, value in featureVector.items() if "diagnostics_" not in key} # TODO: output diagnostics too. remove diagnostic entries, leave only features
     featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
     featureNamesList = [featureName for featureName in featureVector.keys()]
     
     return featureNamesList, featureVectorArray
+
+def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
+    # Extract radiomics features from a list of volumes using the same settings.
+    
+    import threading
+    from multiprocessing import cpu_count, Pool
+    import tempfile
+    
+    if numWorkers is None:
+        numWorkers = cpu_count() - 2
+    
+    featureNamesList = getRadiomicFeatureNames(settings)
+    numFeatures = len(featureNamesList)
+    numVolumes = len(volumeList)
+    featureVectorArray = np.zeros((numFeatures,numVolumes))
+    
+    def computeFeatures(volume):
+        _, tmpFeatures = computeRadiomicFeatures(volume, settings=settings)
+        del _
+        return tmpFeatures
+
+    with Pool(numWorkers) as pool:
+        results = pool.map(computeFeatures,volumeList)
+        
+    featureVectorArray = np.vstack(results).T
+
+    return featureNamesList, featureVectorArray
+
+#%%
+
+if __name__ == "__main__":
+    
+    import glob, nrrd
+    
+    # roi data folder
+    roiDir = "../data/rois/"
+    def getROI(number):
+        filenameNRRD = glob.glob(roiDir+f"*_roi_{number}.nrrd")[0]
+        roi, header = nrrd.read(filenameNRRD)
+        return roi
+    
+    volumeList = []
+    for ind in range(5):
+        volumeList.append(getROI(ind))
+        

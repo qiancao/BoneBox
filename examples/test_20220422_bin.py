@@ -259,7 +259,7 @@ if __name__ == "__main__":
     
     #%%
     
-    numROIs = 280
+    numROIs = 208
     seeds = np.array(range(5))
     
     featuresArray = np.zeros((numROIs,len(featureNames),vScales.size,len(seeds)))
