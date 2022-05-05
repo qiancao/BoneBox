@@ -13,6 +13,7 @@ from __future__ import print_function
 import numpy as np
 import SimpleITK as sitk
 from radiomics import featureextractor
+import functools
 
 def getDefaultSettings():
     # Default radiomic settings
@@ -90,10 +91,9 @@ def computeRadiomicFeatures(volume, settings=None):
 
 def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
     # Extract radiomics features from a list of volumes using the same settings.
+    # https://stackoverflow.com/questions/60116458/multiprocessing-pool-map-attributeerror-cant-pickle-local-object
     
-    import threading
     from multiprocessing import cpu_count, Pool
-    import tempfile
     
     if numWorkers is None:
         numWorkers = cpu_count() - 2
@@ -102,33 +102,29 @@ def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
     numFeatures = len(featureNamesList)
     numVolumes = len(volumeList)
     featureVectorArray = np.zeros((numFeatures,numVolumes))
-    
-    def computeFeatures(volume):
-        _, tmpFeatures = computeRadiomicFeatures(volume, settings=settings)
-        del _
-        return tmpFeatures
 
     with Pool(numWorkers) as pool:
-        results = pool.map(computeFeatures,volumeList)
-        
-    featureVectorArray = np.vstack(results).T
+        results = pool.map(functools.partial(computeRadiomicFeatures, settings=settings),volumeList)
+    
+    featureVectors = [x[1] for x in results]
+    featureVectorArray = np.vstack(featureVectors).T
 
     return featureNamesList, featureVectorArray
-
-#%%
 
 if __name__ == "__main__":
     
     import glob, nrrd
     
     # roi data folder
-    roiDir = "../data/rois/"
+    roiDir = "../../data/rois/"
     def getROI(number):
         filenameNRRD = glob.glob(roiDir+f"*_roi_{number}.nrrd")[0]
         roi, header = nrrd.read(filenameNRRD)
         return roi
     
+    # load 20 rois and compute radiomic features in parallel
     volumeList = []
-    for ind in range(5):
+    for ind in range(20):
         volumeList.append(getROI(ind))
         
+    featureNamesList, featureVectorArray = computeRadiomicFeaturesParallel(volumeList)
