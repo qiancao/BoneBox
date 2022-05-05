@@ -92,6 +92,8 @@ def computeRadiomicFeatures(volume, settings=None):
 def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
     # Extract radiomics features from a list of volumes using the same settings.
     # https://stackoverflow.com/questions/60116458/multiprocessing-pool-map-attributeerror-cant-pickle-local-object
+    #
+    # Note: The output featureVectorArray is in (Nvolumes, Nfeatures)
     
     from multiprocessing import cpu_count, Pool
     
@@ -107,7 +109,7 @@ def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
         results = pool.map(functools.partial(computeRadiomicFeatures, settings=settings),volumeList)
     
     featureVectors = [x[1] for x in results]
-    featureVectorArray = np.vstack(featureVectors).T
+    featureVectorArray = np.vstack(featureVectors)
 
     return featureNamesList, featureVectorArray
 

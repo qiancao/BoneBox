@@ -175,7 +175,7 @@ def simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed=None):
 
 ### Radiomics ###
 
-def getRadiomicFeatureNames(settings=None):
+def getRadiomicFeatureNames():
     #
     # TODO: there must a better way of doing this
     #
@@ -183,12 +183,11 @@ def getRadiomicFeatureNames(settings=None):
     
     # Define settings for signature calculation
     # These are currently set equal to the respective default values
-    if settings is None:
-        settings = {}
-        settings['binWidth'] = 25
-        settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
-        settings['interpolator'] = sitk.sitkBSpline
-        settings['imageType'] = ['original','wavelet']
+    settings = {}
+    settings['binWidth'] = 25
+    settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
+    settings['interpolator'] = sitk.sitkBSpline
+    settings['imageType'] = ['original','wavelet']
     
     # Initialize feature extractor
     extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
@@ -230,7 +229,7 @@ if __name__ == "__main__":
     plt.close("all")
     
     # output directory
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_noise/"
     os.makedirs(outDir,exist_ok=True)
     
     # load stiffness data: see example_rois... 20211116
@@ -254,14 +253,14 @@ if __name__ == "__main__":
     boneHU = 1800
     
     # continuous parameters
-    vScales = np.hstack((np.linspace(0.32,1,2)[0],np.linspace(1,2,10)))
-    nScales = np.hstack((np.linspace(4,1,2)[0],np.linspace(1,0.2,10)))
-    rScales = np.hstack((np.linspace(2,1,2)[0],np.linspace(1,0.3,10)))
+    nScales = np.hstack((np.linspace(4,1,2)[0],np.linspace(1,0.2,3)))
+    rScales = np.ones(nScales.shape)
+    vScales = np.ones(nScales.shape) # np.hstack((np.linspace(0.32,1,2)[0],np.linspace(1,2,3)))
     
     #%%
     
-    numROIs = 280
-    seeds = np.array(range(5))
+    numROIs = 100
+    seeds = np.array(range(1))
     
     featuresArray = np.zeros((numROIs,len(featureNames),vScales.size,len(seeds)))
     
@@ -290,83 +289,83 @@ if __name__ == "__main__":
         
     #%%
     
-    corrArray = np.zeros((len(featureNames),vScales.size))
-    stdSampleArray = np.zeros((len(featureNames),vScales.size,len(seeds))) # standard deviation along samples
-    stdRepeatArray = np.zeros((len(featureNames),vScales.size,numROIs)) # standard deviation along noise realizations
-    meanArray = np.zeros((len(featureNames),vScales.size))
+    # corrArray = np.zeros((len(featureNames),vScales.size))
+    # stdSampleArray = np.zeros((len(featureNames),vScales.size,len(seeds))) # standard deviation along samples
+    # stdRepeatArray = np.zeros((len(featureNames),vScales.size,numROIs)) # standard deviation along noise realizations
+    # meanArray = np.zeros((len(featureNames),vScales.size))
     
-    for ind, vscale in enumerate(vScales):
-        for find, feature in enumerate(featureNames):
+    # for ind, vscale in enumerate(vScales):
+    #     for find, feature in enumerate(featureNames):
         
-            corrArray[find,ind] = np.corrcoef(featuresArray[:,find,ind,1],roi_vm_mean[:numROIs])[0,1]**2
+    #         corrArray[find,ind] = np.corrcoef(featuresArray[:,find,ind,1],roi_vm_mean[:numROIs])[0,1]**2
             
-    stdSampleArray = np.std(featuresArray,axis=0)
-    meanSampleArray = np.mean(featuresArray,axis=0)
-    cvSampleArray =  stdSampleArray / np.abs(meanSampleArray)
+    # stdSampleArray = np.std(featuresArray,axis=0)
+    # meanSampleArray = np.mean(featuresArray,axis=0)
+    # cvSampleArray =  stdSampleArray / np.abs(meanSampleArray)
     
-    stdRepeatArray = np.std(featuresArray,axis=3)
-    meanRepeatArray = np.mean(featuresArray,axis=3)
-    cvRepeatArray = stdRepeatArray / np.abs(meanRepeatArray)
+    # stdRepeatArray = np.std(featuresArray,axis=3)
+    # meanRepeatArray = np.mean(featuresArray,axis=3)
+    # cvRepeatArray = stdRepeatArray / np.abs(meanRepeatArray)
     
-    stdArray = np.std(featuresArray,axis=(0,3))
-    meanArray = np.mean(featuresArray,axis=(0,3))
-    cvArray = stdArray / np.abs(meanArray)
+    # stdArray = np.std(featuresArray,axis=(0,3))
+    # meanArray = np.mean(featuresArray,axis=(0,3))
+    # cvArray = stdArray / np.abs(meanArray)
     
-    #%% Overall R2
+    # #%% Overall R2
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(corrArray,interpolation='nearest', aspect='auto')
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(corrArray,interpolation='nearest', aspect='auto')
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"r2.png")
+    # plt.savefig(outDir+"r2.png")
     
-    #%% Variation with Respect to Total STD
+    # #%% Variation with Respect to Total STD
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(cvArray,interpolation='nearest', aspect='auto',cmap="inferno_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(cvArray,interpolation='nearest', aspect='auto',cmap="inferno_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cv.png")
+    # plt.savefig(outDir+"cv.png")
     
-    #%% Variation with Respect to Noise
+    # #%% Variation with Respect to Noise
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(np.mean(cvRepeatArray,axis=0),interpolation='nearest', aspect='auto',cmap="inferno_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(np.mean(cvRepeatArray,axis=0),interpolation='nearest', aspect='auto',cmap="inferno_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cvRepeatArray.png")
+    # plt.savefig(outDir+"cvRepeatArray.png")
     
-    #%% Portion of 
+    # #%% Portion of 
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(np.mean(cvRepeatArray,axis=0)/cvArray,interpolation='nearest', aspect='auto',cmap="cividis_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(np.mean(cvRepeatArray,axis=0)/cvArray,interpolation='nearest', aspect='auto',cmap="cividis_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cv_fraction.png")
+    # plt.savefig(outDir+"cv_fraction.png")
     
-    #%%
+    # #%%
     
-    stdSampleArray = np.std(featuresArray,axis=0)
+    # stdSampleArray = np.std(featuresArray,axis=0)
     
     
     # plt.figure()

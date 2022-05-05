@@ -18,6 +18,11 @@ import nrrd
 import glob
 import umap
 
+import sys
+sys.path.append("../bonebox/metrics/")
+
+from FeaturesRadiomics import *
+
 def computeNPS(rois,voxSize):
     """
     Compute noise power spectra from ROIs
@@ -152,9 +157,9 @@ def simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed=None):
     roi = applySampling(roi, voxSize, voxSizeNew)
     voxSize = voxSizeNew
     
-    # normalize to 0 and 1, scale to bone HU
-    roi = (roi - np.min(roi)) / (np.max(roi) - np.min(roi))
-    roi = roi * boneHU
+    # # normalize to 0 and 1, scale to bone HU (this is done outside the function now via applyScaling)
+    # roi = (roi - np.min(roi)) / (np.max(roi) - np.min(roi))
+    # roi = roi * boneHU
     
     # get frequency axis
     freqs = getFreqs(roi.shape,voxSizeNew)
@@ -173,64 +178,12 @@ def simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed=None):
     
     return roi_final, noiseS, roiT, S, T
 
-### Radiomics ###
-
-def getRadiomicFeatureNames(settings=None):
-    #
-    # TODO: there must a better way of doing this
-    #
-    # see example_match_glcm_20211103
-    
-    # Define settings for signature calculation
-    # These are currently set equal to the respective default values
-    if settings is None:
-        settings = {}
-        settings['binWidth'] = 25
-        settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
-        settings['interpolator'] = sitk.sitkBSpline
-        settings['imageType'] = ['original','wavelet']
-    
-    # Initialize feature extractor
-    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
-    
-    # Extract radiomics from volume
-    volume = np.random.rand(3,3,3)*256
-    volumeSITK = sitk.GetImageFromArray(volume)
-    maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
-    featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
-    # featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
-    featureNames = list(featureVector.keys())
-    
-    return featureNames
-
-def computeRadiomicFeatures(volume, settings=None):
-    
-    # Define settings for signature calculation
-    # These are currently set equal to the respective default values
-    if settings is None:
-        settings = {}
-        settings['binWidth'] = 25
-        settings['resampledPixelSpacing'] = None  # [3,3,3] is an example for defining resampling (voxels with size 3x3x3mm)
-        settings['interpolator'] = sitk.sitkBSpline
-        settings['imageType'] = ['original','wavelet']
-    
-    # Initialize feature extractor
-    extractor = featureextractor.RadiomicsFeatureExtractor(**settings)  
-    
-    # Extract radiomics from volume
-    volumeSITK = sitk.GetImageFromArray(volume)
-    maskSITK = sitk.GetImageFromArray(np.ones(volume.shape).astype(int))
-    featureVector = extractor.computeFeatures(volumeSITK, maskSITK, imageTypeName="original")
-    featureVectorArray = np.array([featureVector[featureName].item() for featureName in featureVector.keys()])
-    
-    return featureVectorArray
-
 if __name__ == "__main__":
     
     plt.close("all")
     
     # output directory
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel/"
     os.makedirs(outDir,exist_ok=True)
     
     # load stiffness data: see example_rois... 20211116
@@ -242,131 +195,174 @@ if __name__ == "__main__":
     
     # feature names
     featureNames = getRadiomicFeatureNames()
-
-    # roi data folder
-    roiDir = "../data/rois/"
-    def getROI(number):
-        filenameNRRD = glob.glob(roiDir+f"*_roi_{number}.nrrd")[0]
-        roi, header = nrrd.read(filenameNRRD)
-        return roi
     
+    # image parameters
     voxSize = (0.05, 0.05, 0.05) # mm
     boneHU = 1800
     
-    # continuous parameters
-    vScales = np.hstack((np.linspace(0.32,1,2)[0],np.linspace(1,2,10)))
-    nScales = np.hstack((np.linspace(4,1,2)[0],np.linspace(1,0.2,10)))
-    rScales = np.hstack((np.linspace(2,1,2)[0],np.linspace(1,0.3,10)))
+    # get ROIs
+    roiDir = "../data/rois/"
+    
+    def applyScaling(roi):
+        roi = (roi - np.min(roi)) / (np.max(roi) - np.min(roi))
+        roi = roi * boneHU
+        return roi
+    
+    def getROI(number):
+        filenameNRRD = glob.glob(roiDir+f"*_roi_{number}.nrrd")[0]
+        roi, header = nrrd.read(filenameNRRD)
+        roi = applyScaling(roi)
+        return roi
+
+    # parameter space
+    nScales = np.linspace(1.2, 0.2, 60) # change noise only # sweeps across noise and resolution settings
+    rScales = np.linspace(1, 0.3, 40)
+    # nScales = np.linspace(0.2,0.2,5) # change noise only
+    # rScales = np.linspace(0.3,0.3,5)
+    # vScales = np.ones(nScales.shape) # np.hstack((np.linspace(0.32,1,2)[0],np.linspace(1,2,3)))
+    # vScales[0] = 0.32
+    vscale = 1
+    
+    print(f"noise scaling: {nScales}")
+    print(f"resolution scaling: {rScales}")
+    print(f"voxel scaling: {vscale}")
     
     #%%
     
-    numROIs = 280
+    ROI_VISUALIZE = [4,10]
+    
+    numROIs = 208
     seeds = np.array(range(5))
     
-    featuresArray = np.zeros((numROIs,len(featureNames),vScales.size,len(seeds)))
+    featuresArray = np.zeros((numROIs, len(featureNames), nScales.size, rScales.size, len(seeds)))
     
-    for ind, vscale in enumerate(vScales):
+    for indNoise, nscale in enumerate(nScales):
+        for indResolution, rscale in enumerate(rScales):
         
-        print(ind)
-        
-        voxSizeNew = np.array((0.156,0.156,0.2)) * vScales[ind] # mm
-        noise_std = 180 * nScales[ind]
-        stdMTF = np.array([1.8,1.8,0.5]) * rScales[ind]
-        
-        for rind in range(numROIs):
+            print(f"Imaging Config: {indNoise} {indResolution}")
             
-            roi = getROI(rind)
-            
-            roi0 = roi
-            roi0 = (roi0 - np.min(roi0)) / (np.max(roi0) - np.min(roi0))
-            roi0 = roi0 * boneHU
+            voxSizeNew = np.array((0.156,0.156,0.2)) * vscale  # mm
+            noise_std = 180 * nScales[indNoise]
+            stdMTF = np.array([1.8,1.8,0.5]) * rScales[indResolution]
             
             for s, seed in enumerate(seeds):
-                roi_img, noiseS, roiT, S, T = simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed)
-                featureVectorArray = computeRadiomicFeatures(roi_img)
-                featuresArray[rind,:,ind,s] = featureVectorArray
-            
-        np.save(outDir+"featuresArray",featuresArray)
+                
+                print(f"Seed: {seed}")
+                
+                plt.ioff()
+                
+                # simulate images
+                roi_imgs = [] # list of simulated images
+                for rind in range(numROIs):
+                    print(f"simulating roi: {rind}")
+                    roi = getROI(rind)
+                    roi_img, noiseS, roiT, S, T = simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed)
+                    roi_imgs.append(roi_img)
+                    
+                    if rind in ROI_VISUALIZE:
+                        
+                        plt.figure()
+                        plt.imshow(roi_img[:,:,roi_img.shape[2]//2], cmap="gray", vmin=700-3800/2,vmax=700+3800/2)
+                        plt.title(f"ROI: {rind}, Sim: {indNoise} {indResolution}")
+                        plt.savefig(outDir+f"img_{rind}_{indNoise}_{indResolution}.png")
+                        plt.close("all")
+                        
+                        if indNoise == 0 and indResolution == 0:
+                            
+                            plt.figure(visible=False)
+                            plt.imshow(roi[:,:,roi.shape[2]//2], cmap="gray", vmin=700-3800/2,vmax=700+3800/2)
+                            plt.title(f"ROI: {rind}")
+                            plt.savefig(outDir+f"img_{rind}.png")
+                            plt.close("all")
+                    
+                print(f"len(roi_imgs) {len(roi_imgs)}")
+                    
+                print(f"computing features")
+                featureNamesList, featureVectorArray = computeRadiomicFeaturesParallel(roi_imgs, numWorkers=20)
+                featuresArray[:,:,indNoise,indResolution,s] = featureVectorArray
+                print(f"computing features: finished")
+    
+            np.save(outDir+"featuresArray",featuresArray)
         
     #%%
     
-    corrArray = np.zeros((len(featureNames),vScales.size))
-    stdSampleArray = np.zeros((len(featureNames),vScales.size,len(seeds))) # standard deviation along samples
-    stdRepeatArray = np.zeros((len(featureNames),vScales.size,numROIs)) # standard deviation along noise realizations
-    meanArray = np.zeros((len(featureNames),vScales.size))
+    # corrArray = np.zeros((len(featureNames),vScales.size))
+    # stdSampleArray = np.zeros((len(featureNames),vScales.size,len(seeds))) # standard deviation along samples
+    # stdRepeatArray = np.zeros((len(featureNames),vScales.size,numROIs)) # standard deviation along noise realizations
+    # meanArray = np.zeros((len(featureNames),vScales.size))
     
-    for ind, vscale in enumerate(vScales):
-        for find, feature in enumerate(featureNames):
+    # for ind, vscale in enumerate(vScales):
+    #     for find, feature in enumerate(featureNames):
         
-            corrArray[find,ind] = np.corrcoef(featuresArray[:,find,ind,1],roi_vm_mean[:numROIs])[0,1]**2
+    #         corrArray[find,ind] = np.corrcoef(featuresArray[:,find,ind,1],roi_vm_mean[:numROIs])[0,1]**2
             
-    stdSampleArray = np.std(featuresArray,axis=0)
-    meanSampleArray = np.mean(featuresArray,axis=0)
-    cvSampleArray =  stdSampleArray / np.abs(meanSampleArray)
+    # stdSampleArray = np.std(featuresArray,axis=0)
+    # meanSampleArray = np.mean(featuresArray,axis=0)
+    # cvSampleArray =  stdSampleArray / np.abs(meanSampleArray)
     
-    stdRepeatArray = np.std(featuresArray,axis=3)
-    meanRepeatArray = np.mean(featuresArray,axis=3)
-    cvRepeatArray = stdRepeatArray / np.abs(meanRepeatArray)
+    # stdRepeatArray = np.std(featuresArray,axis=3)
+    # meanRepeatArray = np.mean(featuresArray,axis=3)
+    # cvRepeatArray = stdRepeatArray / np.abs(meanRepeatArray)
     
-    stdArray = np.std(featuresArray,axis=(0,3))
-    meanArray = np.mean(featuresArray,axis=(0,3))
-    cvArray = stdArray / np.abs(meanArray)
+    # stdArray = np.std(featuresArray,axis=(0,3))
+    # meanArray = np.mean(featuresArray,axis=(0,3))
+    # cvArray = stdArray / np.abs(meanArray)
     
-    #%% Overall R2
+    # #%% Overall R2
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(corrArray,interpolation='nearest', aspect='auto')
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(corrArray,interpolation='nearest', aspect='auto')
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"r2.png")
+    # plt.savefig(outDir+"r2.png")
     
-    #%% Variation with Respect to Total STD
+    # #%% Variation with Respect to Total STD
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(cvArray,interpolation='nearest', aspect='auto',cmap="inferno_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(cvArray,interpolation='nearest', aspect='auto',cmap="inferno_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cv.png")
+    # plt.savefig(outDir+"cv.png")
     
-    #%% Variation with Respect to Noise
+    # #%% Variation with Respect to Noise
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(np.mean(cvRepeatArray,axis=0),interpolation='nearest', aspect='auto',cmap="inferno_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(np.mean(cvRepeatArray,axis=0),interpolation='nearest', aspect='auto',cmap="inferno_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cvRepeatArray.png")
+    # plt.savefig(outDir+"cvRepeatArray.png")
     
-    #%% Portion of 
+    # #%% Portion of 
     
-    plt.close("all")
+    # plt.close("all")
     
-    plt.figure(figsize=(6,15))
-    plt.imshow(np.mean(cvRepeatArray,axis=0)/cvArray,interpolation='nearest', aspect='auto',cmap="cividis_r")
-    plt.xticks([])
-    plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
-    plt.colorbar(orientation="horizontal",pad=0.01)
-    plt.tight_layout()
+    # plt.figure(figsize=(6,15))
+    # plt.imshow(np.mean(cvRepeatArray,axis=0)/cvArray,interpolation='nearest', aspect='auto',cmap="cividis_r")
+    # plt.xticks([])
+    # plt.yticks(np.arange(len(featureNames)),labels=featureNames,fontsize=8)
+    # plt.colorbar(orientation="horizontal",pad=0.01)
+    # plt.tight_layout()
     
-    plt.savefig(outDir+"cv_fraction.png")
+    # plt.savefig(outDir+"cv_fraction.png")
     
-    #%%
+    # #%%
     
-    stdSampleArray = np.std(featuresArray,axis=0)
+    # stdSampleArray = np.std(featuresArray,axis=0)
     
     
     # plt.figure()
