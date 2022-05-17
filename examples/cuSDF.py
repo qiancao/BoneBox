@@ -27,8 +27,7 @@ import sys
 sys.path.append("../bonebox/phantoms/") # from examples folder
 sys.path.append("../bonebox/FEA/") # from examples folder
 
-# from feaRP import *
-# from fea import *
+from fea import *
 from vtk_utils import *
 from TrabeculaeVoronoi import *
 
@@ -185,9 +184,8 @@ if __name__ == "__main__":
     
     sdf_show(sdf)
     
-    sdf_platten = addPlatten(sdf, 20, plattenValue=0, airValue=np.max(sdf), trimVoxels=10)
-    sdf_platten = set_sdf_boundary(sdf_platten)
-    vertices_sdf, faces_sdf, normals, values = Voxel2SurfMesh(sdf_platten, voxelSize=spacing, origin=None, level=0, step_size=1, allow_degenerate=False)
+    sdf = set_sdf_boundary(sdf)
+    vertices_sdf, faces_sdf, normals, values = Voxel2SurfMesh(sdf, voxelSize=spacing, origin=None, level=0, step_size=1, allow_degenerate=False)
     tmesh = trimesh.Trimesh(vertices_sdf, faces=faces_sdf)
     surf = pv.wrap(tmesh)
     surf.plot()
