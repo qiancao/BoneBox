@@ -183,7 +183,7 @@ if __name__ == "__main__":
     plt.close("all")
     
     # output directory
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel_figures/"
     os.makedirs(outDir,exist_ok=True)
     
     # load stiffness data: see example_rois... 20211116
