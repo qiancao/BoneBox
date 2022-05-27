@@ -113,6 +113,41 @@ def computeRadiomicFeaturesParallel(volumeList, settings=None, numWorkers=None):
 
     return featureNamesList, featureVectorArray
 
+def getNameByString(nameString,featureNames):
+    # Returns index and names of features from featureNames (list) containing nameString
+    inds = []
+    names = []
+    for ind, name in enumerate(featureNames):
+        if f"{nameString}" in name:
+            inds.append(ind)
+            names.append(name)
+    
+    return inds, names
+
+def getFeaturesByName(nameList,featureNames,featureMatrix):
+    # assumes the dimensions of featureMatrix to be:
+    #    (samples,features,...)
+    
+    names = []
+    features = []
+    
+    # convert to list if className is a string
+    if isinstance(nameList,str):
+        nameList = [nameList]
+    
+    if isinstance(nameList,list):
+        for cn in nameList:
+            ii, nn = getNameByString(cn,featureNames)
+            names.extend(nn)
+            features.append(np.take(featureMatrix,ii,axis=1))
+    
+    if len(features)>1:
+        features = np.concatenate(features,axis=1)
+    else:
+        features = features[0]
+    
+    return names, features
+
 if __name__ == "__main__":
     
     import glob, nrrd

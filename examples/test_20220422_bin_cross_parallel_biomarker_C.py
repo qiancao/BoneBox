@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel_biomarker/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel_biomarker_C/"
     os.makedirs(outDir,exist_ok = True)
     
     featuresDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel/"
@@ -56,6 +56,19 @@ if __name__ == "__main__":
     
     # for cind in range(features.shape[2]): # imaging condition
     
+    #%% Reference Configuration
+    
+    ref_config = (30,15,1)
+    
+    indNoise, indResolution, sind = ref_config # TODO: think about just having random sind
+    feat = features[:,:,indNoise,indResolution,sind]
+    X = feat
+    y = roi_vm_mean
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split_size, random_state = 3, shuffle=False)
+    rf_pipe = Pipeline([('scl', StandardScaler()),
+                        ('reg',RandomForestRegressor(n_estimators=100, min_samples_split=10, random_state=0, n_jobs=-1))])
+    rf_pipe.fit(X_train, y_train)
+    
     #%% Run through all scenarios
     
     for indNoise, nscale in enumerate(nScales):
@@ -65,21 +78,22 @@ if __name__ == "__main__":
     
             for sind in range(features.shape[4]): # seed, instance
                 
-                # feature
+                # # feature
                 feat = features[:,:,indNoise,indResolution,sind]
                 
-                # data and target
+                # # data and target
                 X = feat
                 y = roi_vm_mean
                 
-                # Splitting data into training and testing sets
+                # # Splitting data into training and testing sets
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split_size, random_state = 3, shuffle=False)
                 
-                # Random forest Tree Regression Pipeline
-                rf_pipe = Pipeline([('scl', StandardScaler()),
-                                    ('reg',RandomForestRegressor(n_estimators=100, min_samples_split=10, random_state=0, n_jobs=-1))])
+                # # Random forest Tree Regression Pipeline
+                # rf_pipe = Pipeline([('scl', StandardScaler()),
+                #                     ('reg',RandomForestRegressor(n_estimators=100, min_samples_split=10, random_state=0, n_jobs=-1))])
                 
-                rf_pipe.fit(X_train, y_train)
+                # rf_pipe.fit(X_train, y_train)
+                
                 y_pred = rf_pipe.predict(X_test)
                 
                 # scoreTest[cind,sind] = rf_pipe.score(y_pred, y_test)
@@ -107,7 +121,7 @@ if __name__ == "__main__":
             np.save(outDir+"r2Test",r2Test)
             np.save(outDir+"importances",importances)
             
-    #%% Figures and Analysis (run the first cell first, skip the loops)
+    #%% Figures and Analysis
     
     y_preds = np.load(outDir+"y_preds.npy")
     y_test = np.load(outDir+"y_test.npy")
