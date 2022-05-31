@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 
-    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel_biomarker/"
+    outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel_biomarker_A_ablation/"
     os.makedirs(outDir,exist_ok = True)
     
     featuresDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220422_bin_cross_parallel/"
@@ -54,6 +54,7 @@ if __name__ == "__main__":
     # remember to save y_test as well, this is constant throughout the script
     
     # for cind in range(features.shape[2]): # imaging condition
+    
     
     #%% Run through all scenarios
     

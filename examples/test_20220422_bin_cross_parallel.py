@@ -227,12 +227,12 @@ if __name__ == "__main__":
     print(f"resolution scaling: {rScales}")
     print(f"voxel scaling: {vscale}")
     
-    #%%
-    
     ROI_VISUALIZE = [4,10]
     
     numROIs = 208
     seeds = np.array(range(5))
+    
+    #%% Compute Radiomic Features
     
     featuresArray = np.zeros((numROIs, len(featureNames), nScales.size, rScales.size, len(seeds)))
     
@@ -283,7 +283,46 @@ if __name__ == "__main__":
                 print(f"computing features: finished")
     
             np.save(outDir+"featuresArray",featuresArray)
+            
+    #%% Save MTF and NPS profiles, compute standard deviation
+    
+    roi = getROI(0)
+    indNoise, indResolution, seed = 0, 0, 0
+    
+    voxSizeNew = np.array((0.156,0.156,0.2)) * vscale  # mm
+    noise_std = 180 * nScales[indNoise]
+    stdMTF = np.array([1.8,1.8,0.5]) * rScales[indResolution]
+    
+    roi_img, noiseS, roiT, S, T = simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed)
+    nf = np.ceil((roi_img.shape[0]+1)/2).astype(int)
+    
+    noiseSTD = np.zeros((nScales.size, rScales.size))
+    MTFs = np.zeros((nf, nScales.size, rScales.size))
+    NPSs = np.zeros((nf, nScales.size, rScales.size))
+    
+    for indNoise, nscale in enumerate(nScales):
+        for indResolution, rscale in enumerate(rScales):
+            
+            print(f"{indNoise}, {indResolution}")
+            
+            # for s, seed in enumerate(seeds):
+
+            voxSizeNew = np.array((0.156,0.156,0.2)) * vscale  # mm
+            noise_std = 180 * nScales[indNoise]
+            stdMTF = np.array([1.8,1.8,0.5]) * rScales[indResolution]                
+
+            roi_img, noiseS, roiT, S, T = simulateImage(roi, voxSize, voxSizeNew, stdMTF, noise_std, seed)
+            
+            MTFs[:,indNoise,indResolution] = T[:nf,0,0]
+            NPSs[:,indNoise,indResolution] = S[:nf,0,0]
+            noiseSTD[indNoise,indResolution] = np.std(noiseS)
+            
         
+    np.save(outDir+"MTFs",MTFs)
+    np.save(outDir+"NPSs",NPSs)
+    np.save(outDir+"noiseSTD",noiseSTD)
+    np.save(outDir+"noiseSTDmean",np.mean(noiseSTD,axis=1))
+    
     #%%
     
     # corrArray = np.zeros((len(featureNames),vScales.size))
