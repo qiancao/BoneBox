@@ -162,4 +162,16 @@ if __name__ == "__main__":
         
         plt.close("all")
         
-    #%% 
+    #%% Sum all feature importances EXCEPT first order
+    
+    img = importances[18:,:,:,:]
+
+    fig = plt.figure(figsize=(7,8))
+    cax = fig.axes
+    im = plt.imshow(np.mean(np.sum(img[19:],axis=0),axis=2),cmap="YlGn")
+    plt.xlabel("Resolution")
+    plt.ylabel("Noise Level")
+    plt.title(f"Importance Mean: nonfirstorder")
+    plt.colorbar()
+    plt.savefig(outDir+f"fig-imp-nonfirstorder-mean.png")
+        
