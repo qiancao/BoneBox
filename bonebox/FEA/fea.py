@@ -14,9 +14,11 @@ import nrrd
 
 # meshing
 from skimage import measure
-import tetgen
-import trimesh
+import tetgen # tetrahedralization
+import trimesh # general mesh ops
 import pyvista as pv
+# import pyfqmr # mesh simplification
+import open3d as o3d
 
 # finite element library
 import pychrono as chrono
@@ -46,17 +48,29 @@ def addPlatten(volume, plattenThicknessVoxels, plattenValue=None, airValue=None,
 
     return volume
 
-def set_volume_bounds(volume, airValue=None):
+def set_volume_bounds(volume, airValue=None, bounds = 1):
+    # set boundaries of volume to airValue
     
     if airValue is None:
         airValue = np.min(volume)
         
-    volume[0,:,:] = airValue
-    volume[-1,:,:] = airValue
-    volume[:,0,:] = airValue
-    volume[:,-1,:] = airValue
-    volume[:,:,0] = airValue
-    volume[:,:,-1] = airValue
+    volume[:(bounds+1),:,:] = airValue
+    volume[-(bounds+1):,:,:] = airValue
+    volume[:,:(bounds+1),:] = airValue
+    volume[:,-(bounds+1):,:] = airValue
+    volume[:,:,:(bounds+1)] = airValue
+    volume[:,:,-(bounds+1):] = airValue
+    
+    return volume
+
+def filter_connected(volume):
+    # filter out unconnected components
+    # performs connected component analysis and preserves only the largest connected component
+    
+    labels = measure.label(volume)
+    values = np.unique(labels)
+    values.sort()
+    num_voxels = [np.sum(labels==x) for x in values]
     
     return volume
 
@@ -199,16 +213,54 @@ def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size
             
     return vertices, faces, normals, values
 
-def Surf2TetMesh(vertices, faces, order=1, verbose=1):
+def Surf2TetMesh(vertices, faces, order=1, verbose=1, **tetkwargs):
     # Convert surface mesh to tetrahedra
     
     tet = tetgen.TetGen(vertices,faces)
-    tet.tetrahedralize(order=order,verbose=verbose)
+    tet.tetrahedralize(order=order, verbose=verbose, **tetkwargs)
     
     nodes = tet.node
     elements = tet.elem
     
     return nodes, elements, tet
+
+def smoothSurfMesh(vertices, faces, **trimeshkwargs):
+    # smooths surface mesh using Mutable Diffusion Laplacian method
+    
+    mesh = trimesh.Trimesh(vertices = vertices, faces = faces)
+    trimesh.smoothing.filter_mut_dif_laplacian(mesh, **trimeshkwargs)
+    
+    return mesh.vertices, mesh.faces
+
+# TODO: FQMR doesn't seem to generate watertight meshes
+# def simplifySurfMesh(vertices, faces, target_fraction=0.25, lossless=True,
+#                      preserve_border=True, **kwargs):
+#     # simplify surface mesh
+    
+#     # if target_count is not specified
+#     Nfaces = faces.shape[0]
+#     if "target_count" not in kwargs.keys():
+#         kwargs["target_count"] = round(Nfaces*target_fraction)
+    
+#     mesh_simplifier = pyfqmr.Simplify()
+#     mesh_simplifier.setMesh(vertices, faces)
+#     mesh_simplifier.simplify_mesh(**kwargs)
+    
+#     vertices, faces, normals = mesh_simplifier.getMesh()
+    
+#     return vertices, faces
+
+def simplifySurfMesh(vertices, faces, target_fraction=0.25, lossless=True,
+                      preserve_border=True, **kwargs):
+    # simplify surface mesh, use open3D
+    
+    Nfaces = faces.shape[0]
+    target_count = round(Nfaces*target_fraction)
+
+    mesh = trimesh.Trimesh(vertices = vertices, faces = faces).as_open3d
+    mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=target_count)
+
+    return np.asarray(mesh.vertices), np.asarray(mesh.triangles)
 
 def isWatertight(vertices, faces):
     # Check if mesh is watertight
@@ -497,7 +549,7 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     return feaResult
 
 def computeFEAElasticModulus(feaResult):
-    # Compute elastic modulus from feaResult
+    # Compute elastic modulus from feaResult (TODO: this is not the real elastic modulus)
     
     displacement = feaResult["displacement"]
     nodeIndA = feaResult["nodeIndA"]

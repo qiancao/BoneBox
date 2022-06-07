@@ -55,9 +55,7 @@ if __name__ == "__main__":
 
     #%% Run through all scenarios (BMD metrics only)
     
-    nameList = ["_firstorder_10Percentile","_firstorder_90Percentile","_firstorder_Maximum",
-                "_firstorder_Mean","_firstorder_Median"
-                ]
+    nameList = ["_firstorder_Mean","_firstorder_Median"]
     
     names_filtered, features_filtered = getFeaturesByName(nameList,featureNames,features)
     
