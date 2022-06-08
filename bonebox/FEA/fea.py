@@ -17,8 +17,6 @@ from skimage import measure
 import tetgen # tetrahedralization
 import trimesh # general mesh ops
 import pyvista as pv
-# import pyfqmr # mesh simplification
-import open3d as o3d
 
 # finite element library
 import pychrono as chrono
@@ -63,16 +61,28 @@ def set_volume_bounds(volume, airValue=None, bounds = 1):
     
     return volume
 
-def filter_connected(volume):
-    # filter out unconnected components
+def filter_connected_volume(volume):
+    # filter out components unconnected to the main bone structure
     # performs connected component analysis and preserves only the largest connected component
     
-    labels = measure.label(volume)
-    values = np.unique(labels)
+    labels = measure.label(volume,connectivity=1)
+    values = np.unique(labels) # get all labels
     values.sort()
+    values = values[1:] # discard zeros (background)
     num_voxels = [np.sum(labels==x) for x in values]
+    largest_component_label = values[np.argmax(num_voxels)]
     
-    return volume
+    vmin = np.min(volume)
+    vmax = np.max(volume)
+    
+    volume_out = np.ones(volume.shape,dtype=volume.dtype) * vmin
+    volume_out[labels==largest_component_label] = vmax
+    
+    return volume_out
+
+def filter_connected_mesh(faces):
+    # filter out components unconnected to the main bone structure
+    pass
 
 def Voxel2HexaMeshIndexCoord(volume):
     """
@@ -215,6 +225,7 @@ def Voxel2SurfMesh(volume, voxelSize=(1,1,1), origin=None, level=None, step_size
 
 def Surf2TetMesh(vertices, faces, order=1, verbose=1, **tetkwargs):
     # Convert surface mesh to tetrahedra
+    # https://github.com/pyvista/tetgen/blob/master/tetgen/pytetgen.py
     
     tet = tetgen.TetGen(vertices,faces)
     tet.tetrahedralize(order=order, verbose=verbose, **tetkwargs)
@@ -233,26 +244,28 @@ def smoothSurfMesh(vertices, faces, **trimeshkwargs):
     return mesh.vertices, mesh.faces
 
 # TODO: FQMR doesn't seem to generate watertight meshes
-# def simplifySurfMesh(vertices, faces, target_fraction=0.25, lossless=True,
-#                      preserve_border=True, **kwargs):
-#     # simplify surface mesh
-    
-#     # if target_count is not specified
-#     Nfaces = faces.shape[0]
-#     if "target_count" not in kwargs.keys():
-#         kwargs["target_count"] = round(Nfaces*target_fraction)
-    
-#     mesh_simplifier = pyfqmr.Simplify()
-#     mesh_simplifier.setMesh(vertices, faces)
-#     mesh_simplifier.simplify_mesh(**kwargs)
-    
-#     vertices, faces, normals = mesh_simplifier.getMesh()
-    
-#     return vertices, faces
-
-def simplifySurfMesh(vertices, faces, target_fraction=0.25, lossless=True,
+def simplifySurfMeshFQMR(vertices, faces, target_fraction=0.25, lossless=True,
                       preserve_border=True, **kwargs):
-    # simplify surface mesh, use open3D
+    # simplify surface mesh
+    import pyfqmr
+    
+    # if target_count is not specified
+    Nfaces = faces.shape[0]
+    if "target_count" not in kwargs.keys():
+        kwargs["target_count"] = round(Nfaces*target_fraction)
+    
+    mesh_simplifier = pyfqmr.Simplify()
+    mesh_simplifier.setMesh(vertices, faces)
+    mesh_simplifier.simplify_mesh(**kwargs)
+    
+    vertices, faces, normals = mesh_simplifier.getMesh()
+    
+    return vertices, faces
+
+def simplifySurfMeshOpen3D(vertices, faces, target_fraction=0.25, lossless=True,
+                      preserve_border=True, **kwargs):
+    # simplify surface mesh, use open3D, does not always generate watertight mesh
+    import open3d as o3d # mesh simplification TODO: Optional
     
     Nfaces = faces.shape[0]
     target_count = round(Nfaces*target_fraction)
@@ -261,6 +274,32 @@ def simplifySurfMesh(vertices, faces, target_fraction=0.25, lossless=True,
     mesh = mesh.simplify_quadric_decimation(target_number_of_triangles=target_count)
 
     return np.asarray(mesh.vertices), np.asarray(mesh.triangles)
+
+def simplifySurfMeshACVD(vertices, faces, target_fraction=0.25):
+    # simplify surface mesh, use pyacvd
+    import pyacvd
+    
+    Nfaces = faces.shape[0]
+    target_count = round(Nfaces*target_fraction)
+    
+    mesh = trimesh.Trimesh(vertices = vertices, faces = faces)
+    mesh = pv.wrap(mesh)
+    
+    clus = pyacvd.Clustering(mesh)
+    clus.cluster(target_count)
+    
+    mesh = clus.create_mesh()
+    
+    # https://github.com/pyvista/pyvista/discussions/2268
+    faces_as_array = mesh.faces.reshape((mesh.n_faces, 4))[:, 1:]
+    tmesh = trimesh.Trimesh(vertices = mesh.points, faces = faces_as_array)
+    
+    return tmesh.vertices, tmesh.faces
+
+def repairSurfMesh(vertices, faces):
+    import pymeshfix
+    vclean, fclean = pymeshfix.clean_from_arrays(vertices, faces)
+    return vclean, fclean
 
 def isWatertight(vertices, faces):
     # Check if mesh is watertight
