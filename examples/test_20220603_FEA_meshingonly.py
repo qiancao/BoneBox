@@ -6,6 +6,7 @@ Created on Fri Jun  3 16:37:21 2022
 @author: qian.cao
 
 # Run FEA on Harsha's 700+ new ROIs for the L4 L5 data
+# does not perform FEA, meshing only
 
 """
 
@@ -41,7 +42,7 @@ if __name__ == "__main__":
 
     # make output directories
     stepsize = 1
-    postfix = f"_linear_stepsize_{stepsize}"
+    postfix = f"_linear_stepsize_{stepsize}_mesh"
     
     outDir = "/gpfs_projects/qian.cao/BoneBox-out/test_20220603_FEA/"
     os.makedirs(outDir,exist_ok=True)
@@ -52,8 +53,8 @@ if __name__ == "__main__":
     vtkDir = outDir+f"vtk{postfix}/"
     os.makedirs(vtkDir,exist_ok=True)
     
-    hdfDir = outDir+f"fea{postfix}/"
-    os.makedirs(hdfDir,exist_ok=True)
+    # hdfDir = outDir+f"fea{postfix}/"
+    # os.makedirs(hdfDir,exist_ok=True)
     
     figDir = outDir+f"fig{postfix}/"
     os.makedirs(figDir,exist_ok=True)
@@ -103,7 +104,7 @@ if __name__ == "__main__":
                 filenameSTLsmooth = stlDir+tail+"_smoothed.stl"
                 filenameSTLsimplify = stlDir+tail+"_simplified.stl"
                 filenameVTK = vtkDir+tail+".vtk"
-                filenameHDF = hdfDir+tail+".hdf5"
+                # filenameHDF = hdfDir+tail+".hdf5"
                 filenamePNG = figDir+tail+".png"
                 filenamePNGfea = figDir+tail+"_fea.png"
                 
@@ -156,29 +157,29 @@ if __name__ == "__main__":
                 
                 print("Surface Mesh Tetrahedralized")
                 
-                feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="ParadisoMKL")
+                # feaResult = computeFEACompressLinear(nodes, elements, plattenThicknessMM, solver="ParadisoMKL")
                 
-                print("FEA Done")
+                # print("FEA Done")
                 
-                with h5py.File(filenameHDF, "w") as hf:
-                    hdfdict.dump(feaResult, hf)
+                # with h5py.File(filenameHDF, "w") as hf:
+                #     hdfdict.dump(feaResult, hf)
                     
                 segSuccessful.append(tail)
                 
-                print("file processed")
+                # print("file processed")
                 
-                # plot FEA result
-                resultsDict = dict(hdfdict.load(filenameHDF))
+                # # plot FEA result
+                # resultsDict = dict(hdfdict.load(filenameHDF))
                 
-                meshFEA = mesh.copy()
-                meshFEA.points = mesh.points + resultsDict["displacement"]*1e10
+                # meshFEA = mesh.copy()
+                # meshFEA.points = mesh.points + resultsDict["displacement"]*1e10
                 
-                pv.set_plot_theme('document')
-                plotter = pv.Plotter(off_screen=True)
-                plotter.add_mesh(mesh, color="white",opacity=0.1)
-                plotter.add_mesh(meshFEA, scalars=resultsDict["elementVMstresses"].flatten(),clim=[0,0.15])
-                plotter.camera_position = camera_position
-                plotter.show(screenshot=filenamePNGfea)
+                # pv.set_plot_theme('document')
+                # plotter = pv.Plotter(off_screen=True)
+                # plotter.add_mesh(mesh, color="white",opacity=0.1)
+                # plotter.add_mesh(meshFEA, scalars=resultsDict["elementVMstresses"].flatten(),clim=[0,0.15])
+                # plotter.camera_position = camera_position
+                # plotter.show(screenshot=filenamePNGfea)
             
             except:
                 
