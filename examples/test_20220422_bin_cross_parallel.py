@@ -123,9 +123,11 @@ def shapeNPS(noise, NPS):
     return noise_filtered
 
 def NPS2noise(NPS,seed=None):
-    # generates noise from a white noise and power spectra
-    # note: frequency axes must match image
-    # see https://www.mathworks.com/matlabcentral/fileexchange/36462-noise-power-spectrum
+    """
+    Generates noise from a white noise and power spectra
+    Note: frequency axes must match that of the image
+    see https://www.mathworks.com/matlabcentral/fileexchange/36462-noise-power-spectrum
+    """
     
     rng = np.random.default_rng(seed)
     v = rng.random(NPS.shape,dtype=np.float64)

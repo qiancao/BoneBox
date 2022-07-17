@@ -30,7 +30,7 @@ import nrrd
 import os
 import sys
 
-sys.path.append("/home/qian.cao/projectchrono/chrono_build/build/bin") # TODO: pychrono temporary build
+sys.path.append("/home/qian.cao/betsy-setup/chrono_build/build/bin") # TODO: pychrono temporary build
 sys.path.append(os.path.abspath(os.path.join(os.getcwd(),"../bonebox/FEA/"))) # TODO: replace this with relative imports, e.g. from ..FEA.fea import *
 from fea import addPlatten, set_volume_bounds, filter_connected_volume, \
     Voxel2SurfMesh, isWatertight, smoothSurfMesh, \
@@ -48,6 +48,8 @@ def cropCubeFromCenter(img,length):
                slice(z0-R,z0+R+1)]
 
 if __name__ == "__main__":
+
+    print(f"======= starting {__file__} =====")
 
     # Parse arguments
     parser = argparse.ArgumentParser(description="Process binary images (.nrrd) into tetrahedral meshes (.vtk)")

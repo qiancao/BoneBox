@@ -457,7 +457,7 @@ def computeFEACompressLinearHex(nodes, elements, plateThickness, \
     
 def computeFEACompressLinear(nodes, elements, plateThickness, \
                              elasticModulus=17e9, poissonRatio=0.3, \
-                             force_total = 1, solver="ParadisoMKL"):
+                             force_total = 1, solver="ParadisoMKL", verbose=False):
     # TODO: Think about how to refactor this
     # Linear Finite Element Analysis with PyChrono
     # plateThickness: Thickness of compression plates in absolute units
@@ -479,6 +479,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         ele_list[ind].SetNodes(node_list[node0ind], node_list[node1ind], node_list[node2ind], node_list[node3ind])
         ele_list[ind].SetMaterial(material)
         mesh.AddElement(ele_list[ind]) # use 0-based indexing here
+
+    if verbose:
+        print("- Mesh Loaded")
         
     mesh.SetAutomaticGravity(False)
     system.Add(mesh)
@@ -489,11 +492,14 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     faceA_nodeind = np.asarray(np.nonzero(nodes[:,2]>zmax))[0]
     faceB_nodeind = np.asarray(np.nonzero(nodes[:,2]<zmin))[0]
     
-    # Distribute total force over nodes on face A
+    # Distribute total force over nodes onW face A
     force_dist = force_total / len(faceA_nodeind)
     
     for ind in faceA_nodeind:
         node_list[ind].SetForce(chrono.ChVectorD(0,0,-force_dist))
+
+    if verbose:
+        print("- Force Set")
     
     # Face B: Fixed truss
     truss = chrono.ChBody()
@@ -510,6 +516,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         constr_list.append(fea.ChLinkPointFrame())
         constr_list[-1].Initialize(node_list[ind],truss)
         system.Add(constr_list[-1])
+
+    if verbose:
+        print("- Fixed Truss Set")
     
     # Add face A nodes to moving truss
     constr_list_moving = []
@@ -517,6 +526,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         constr_list_moving.append(fea.ChLinkPointFrame())
         constr_list_moving[-1].Initialize(node_list[ind],truss_moving)
         system.Add(constr_list_moving[-1])
+
+    if verbose:
+        print("- Moving Truss Set")
     
     # Prismatic Joint, this works for Paradiso MKL solver
     constr_A = chrono.ChLinkLockPrismatic()
@@ -526,15 +538,26 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
     if solver == "ParadisoMKL": # TODO: Validate results from this solver
         msolver = mkl.ChSolverPardisoMKL()
         msolver.LockSparsityPattern(True)
+        
+        if verbose:
+            print("- Solver: ParadisoMKL")
+
     else: # MINRES solver
         msolver = chrono.ChSolverMINRES()
         msolver.SetMaxIterations(100)
         msolver.SetTolerance(1e-10)
         msolver.EnableDiagonalPreconditioner(True)
         msolver.SetVerbose(True)
+
+        if verbose:
+            print("- Solver: MINRES")
+
     
     system.SetSolver(msolver)
     system.DoStaticLinear()
+
+    if verbose:
+        print("- Linear solve complete")
     
     ## Format FEA output
     
@@ -545,6 +568,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         node_arr_sol[ind,0] = pos.x
         node_arr_sol[ind,1] = pos.y
         node_arr_sol[ind,2] = pos.z
+
+    if verbose:
+        print("- Node positions parsed")
     
     # element centroid positions
     ele_centroid = np.empty([len(ele_list),3]) ##### <<< elemental centroid position
@@ -555,6 +581,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
             sumxyz += nodes[nodeind,0:3]
         sumxyz = sumxyz / 4 # center of 4 nodes
         ele_centroid[ind,:] = sumxyz
+
+    if verbose:
+        print("- Centroid positions parsed")
         
     ele_Tstress = np.empty((len(ele_list),6))
     ele_Tstrain = np.empty((len(ele_list),6))
@@ -572,6 +601,9 @@ def computeFEACompressLinear(nodes, elements, plateThickness, \
         ele_Tstress[ind,:] = stress_vector.reshape((1,6))
         ele_Tstrain[ind,:] = strain_vector.reshape((1,6))
         ele_VMstress[ind,:] = sigVM
+
+    if verbose:
+        print("- Getting element strains")
         
     feaResult = {
         "nodes" : nodes,
