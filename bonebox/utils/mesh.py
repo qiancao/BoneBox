@@ -307,5 +307,14 @@ def saveSurfaceMesh(filename, vertices, faces):
 def saveTetrahedralMesh(filename, tet):
     pv.save_meshio(filename, tet.grid)
 
+def cropCubeFromCenter(img,length):
+    
+    x0,y0,z0 = np.array(img.shape)//2
+    R = length//2
+    
+    return img[slice(x0-R,x0+R+1),
+               slice(y0-R,y0+R+1),
+               slice(z0-R,z0+R+1)]
+
 if __name__ == "__main__":
     pass

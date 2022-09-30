@@ -49,6 +49,7 @@ if __name__ == "__main__":
     NUMFILES = 681 # files for Segmentation Otsu (different for Segmentation L1 Otsu)
     crop_size = 201
     voxel_size = 0.05
+    smooth_iterations = 15
 
     whereami = socket.gethostname()
 
