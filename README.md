@@ -2,6 +2,8 @@
 
 Tools for bone modeling, evaluation and biomarker development.
 
+![alt text](skeleton.gif)
+
 ### Install Dependencies
 
 Clone the repository.
