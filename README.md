@@ -21,48 +21,26 @@ conda activate bonebox
 ### Example: Generating a simple Voronoi-based Trabecular Model
 
 ```
-import numpy as np
-from bonebox.Phantoms.TrabeculaeVoronoi import *
+import matplotlib.pyplot as plt
+from bonebox.Phantoms.TrabeculaeVoronoi.zoo import RandomDropout
 
 # Parameters for generating phantom mesh
-Sxyz, Nxyz = (10,10,10), (10,10,10) # volume extent in XYZ (mm), number of seeds along XYZ
-Rxyz = 1.
-edgesRetainFraction = 0.5
-facesRetainFraction = 0.1
-dilationRadius = 3 # (voxels)
-randState = 123 # for repeatability
 
-# Parameters for generating phantom volume
-volumeSizeVoxels = (200,200,200)
-voxelSize = np.array(Sxyz) / np.array(volumeSizeVoxels)
+volume_extent = (3,)*3 # in mm
+volume_ndim = (120,)*3 # number of pixels in each dimension
+mean_TbTh = 0.08 # mean trabecular thickness
+std_TbTh = 0.01 # standard deviation of trabecular thickness
 
-# Generate faces and edges
-points = makeSeedPointsCartesian(Sxyz, Nxyz)
-ppoints = perturbSeedPointsCartesianUniformXYZ(points, Rxyz, randState=randState)
-vor, ind = applyVoronoi(ppoints, Sxyz)
-uniqueEdges, uniqueFaces = findUniqueEdgesAndFaces(vor, ind)
+# Generate trabecular bone phantom based on random dropout
 
-# Compute edge cosines
-edgeVertices = getEdgeVertices(vor.vertices, uniqueEdges)
-edgeCosines = computeEdgeCosine(edgeVertices, direction = (0,0,1))
+volume = RandomDropout.generate(volume_extent=volume_extent,
+                                volume_ndim=volume_ndim,
+                                mean_TbTh=mean_TbTh,
+                                std_TbTh=std_TbTh)
 
-# Compute face properties
-faceVertices = getFaceVertices(vor.vertices, uniqueFaces)
-faceAreas = computeFaceAreas(faceVertices)
-faceCentroids = computeFaceCentroids(faceVertices)
-faceNormals = computeFaceNormals(faceVertices)
+# Plot integral through volume
+plt.imshow(np.sum(volume,axis=2),cmap="gray");plt.axis("off")
 
-# Filter random edges and faces
-uniqueEdgesRetain, edgesRetainInd = filterEdgesRandomUniform(uniqueEdges, 
-                                                             edgesRetainFraction, 
-                                                             randState=randState)
-uniqueFacesRetain, facesRetainInd = filterFacesRandomUniform(uniqueFaces, 
-                                                             facesRetainFraction, 
-                                                             randState=randState)
-
-volumeEdges = makeSkeletonVolumeEdges(vor.vertices, uniqueEdgesRetain, voxelSize, volumeSizeVoxels)
-volumeFaces = makeSkeletonVolumeFaces(vor.vertices, uniqueFacesRetain, voxelSize, volumeSizeVoxels)
-
-# Uniform dilation
-volumeDilated = dilateVolumeSphereUniform(np.logical_or(volumeEdges,volumeFaces), dilationRadius)
 ```
+
+![alt text](integral.png)

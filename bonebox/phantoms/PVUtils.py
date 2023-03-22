@@ -10,6 +10,19 @@ Utilities for PyVista
 import numpy as np
 import pyvista as pv
 
+def scalar2rgb(x,palette,vmin,vmax):
+    
+    import matplotlib as mpl
+    from matplotlib import cm
+    import seaborn as sns
+    
+    norm = mpl.colors.Normalize(vmin=vmin, vmax=vmax)
+    cmap = sns.light_palette(palette, as_cmap=True)
+    scalarMap = cm.ScalarMappable(norm=norm, cmap=cmap)
+    colors = scalarMap.to_rgba(x)
+    
+    return colors
+
 def formatPV(arr):
     """
     
@@ -38,13 +51,17 @@ def vef2pd(v,e,f):
 
     """
     
-    e = formatPV(np.array(e))
-    f = formatPV(np.array(f))
+    if e is not None:
+        e = formatPV(np.array(e))
+        
+    if f is not None:
+        f = formatPV(np.array(f))
+        
     pd = pv.PolyData(v, f, lines=e)
     
     return pd
 
-def vef2plotter(v,e,f):
+def vef2plotter(v,e,f,add_mesh_opts=None):
     """
     Visualize vertices, edges, and faces using pyvista.Plotter
 
@@ -57,7 +74,11 @@ def vef2plotter(v,e,f):
     pd = vef2pd(v, e, f)
     
     p = pv.Plotter()
-    p.add_mesh(pd)
     
+    if add_mesh_opts is None:
+        p.add_mesh(pd)
+    else:
+        p.add_mesh(pd,**add_mesh_opts)
+        
     return p
 

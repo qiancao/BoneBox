@@ -64,7 +64,7 @@ def removeEdgesWithFaces(edges, faces):
     else:
         return edges
 
-def generatePoissonScaffold(volume_extent=np.array([5,5,5]),radius=0.5,k=30,seed=None,centered=False, init=None, return_init=False):
+def generatePoissonScaffold(volume_extent=np.array([5,5,5]),radius=0.5,k=30,seed=None,centered=False, init=None, return_init=False, remove_hull=True):
     """
     
     Generate Poisson disc sampled points and delunary triangulate for fully-connected faces and edges
@@ -105,6 +105,16 @@ def generatePoissonScaffold(volume_extent=np.array([5,5,5]),radius=0.5,k=30,seed
     edges = delaunay2simplex(tri,2)
     faces = delaunay2simplex(tri,3)
     
+    if remove_hull: # remove edges and faces associated with the convex hull
+        hull = scipy.spatial.ConvexHull(vertices)
+        edges_hull = delaunay2simplex(hull,2)
+        faces_hull = delaunay2simplex(hull,3)
+        edges = list(set(edges) - set(edges_hull))
+        faces = list(set(faces) - set(faces_hull))
+        
+    edges = np.array(edges)
+    faces = np.array(faces)
+    
     return vertices, edges, faces, init_mask
 
 def getEdgeLengths(v,e):
@@ -129,6 +139,31 @@ def getEdgeLengths(v,e):
     e = np.array(e)
 
     return np.sqrt(np.sum((v[e[:,1]] - v[e[:,0]])**2,axis=1))
+
+def getEdgeDirections(v,e):
+    """
+    Returns edge lengths from vertices and edges.
+
+    Parameters
+    ----------
+    v : TYPE
+        DESCRIPTION.
+    e : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    TYPE
+        DESCRIPTION.
+
+    """
+    
+    v = np.array(v)
+    e = np.array(e)
+    
+    l = getEdgeLengths(v,e)
+
+    return (v[e[:,1]] - v[e[:,0]])/l[:,None]
 
 def getNearestPoints(v_from, v_to):
     """
@@ -417,7 +452,7 @@ def pd2volume(pd,volume_extent,ndim,origin=(0,0,0),volume0=None):
     
     return volume
 
-def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=10,phi_resolution=10):
+def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=5,phi_resolution=5):
     """
     Converts graph (vertices, radii, edges, faces to voxel volume)
     
@@ -433,10 +468,12 @@ def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=10,ph
     volume = np.zeros(ndim,dtype=bool)
     
     for ee, edge in enumerate(e): # use cleaned edges
+        print(f"edges: {ee}/{len(e)}")
         pd = makeSlab(v,r,e[ee],theta_resolution=theta_resolution,phi_resolution=phi_resolution)
         volume = pd2volume(pd,volume_extent,ndim,origin=origin,volume0=volume)
     
     for ff, face in enumerate(f):
+        print(f"faces: {ff}/{len(f)}")
         pd = makeSlab(v,r,f[ff],theta_resolution=theta_resolution,phi_resolution=phi_resolution)
         volume = pd2volume(pd,volume_extent,ndim,origin=origin,volume0=volume)
     
@@ -449,7 +486,16 @@ def volume2surf(volume,voxelSize=(1,1,1),origin=None):
     
     volume: array of 0 and 1
     
+    sets boundary voxels of the volume to 0
+    
     """
+    
+    volume[0,:,:] = 0
+    volume[-1,:,:] = 0
+    volume[:,0,:] = 0
+    volume[:,-1,:] = 0
+    volume[:,:,0] = 0
+    volume[:,:,-1] = 0
     
     import MeshUtils
     
@@ -463,7 +509,7 @@ def volume2surf(volume,voxelSize=(1,1,1),origin=None):
     
     return surf_v, surf_f
 
-def Gp_edges(f):
+def Gf_edges(f):
     """
     Generates edges for graph of plates
 
@@ -532,7 +578,6 @@ def computeFaceNormals(faceVertices):
     
     return faceNormals
 
-
 def angle_btw(v0, v1):
     """
     returns angle (in radians) between v0 and v1.
@@ -589,7 +634,94 @@ def cosine_btw(v0, v1):
     
     return np.abs(np.dot(v0,v1))
 
-def Gp_edge_weights(v,f,fe):
+def computeFaceCentroids(faceVertices):
+    """
+    Compute face centroid for a list of face vertex coordinates.
+
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
+
+    Returns
+    -------
+    faceCentroids : np.ndarray (Nfaces, 3)
+
+    """
+    def computeCentroid(verts):
+        return np.mean(verts,axis=0)
+    
+    faceCentroids = np.array([computeCentroid(x) for x in faceVertices])
+    
+    return faceCentroids
+
+def computeFaceAreas(faceVertices):
+    """
+    Compute face area for a list of face vertex coordinates.
+    
+    https://math.stackexchange.com/questions/3207981/caculate-area-of-polygon-in-3d
+
+    Parameters
+    ----------
+    faceVertices : list of np.ndarrays (FaceVerts,3)'s
+        Face vertex coordinates. Note: Each face may have different number of coplanar vertices.
+
+    Returns
+    -------
+    faceAreas : np.ndarray (Nfaces, 3)
+
+    """
+    def computeArea(verts):
+        # compute area for a list of coplanar 3D vertices
+        
+        v0 = verts[0,:]
+        vk = verts[2:,:] - v0
+        vj = verts[1:-1,:] - v0
+        
+        # ||sum(vk x vj)||/2
+        area = np.linalg.norm(np.sum(np.cross(vk,vj,axis=1),axis=0))/2
+        
+        return area
+    
+    faceAreas = np.array([computeArea(x) for x in faceVertices])
+    
+    return faceAreas
+
+def computeFaceEqualateralities(faceVertices):
+    
+    def computeEqualaterality(verts):
+        
+        v0 = verts[0,:]
+        vk = np.linalg.norm(verts[2:,:] - v0)
+        vj = np.linalg.norm(verts[1:-1,:] - v0)
+        vl = np.linalg.norm(vk-vj)
+        
+        CV = np.std([vk,vj,vl]) / np.mean([vk,vj,vl])
+        
+        return CV
+    
+    faceEqualaterality = np.array([computeEqualaterality(x) for x in faceVertices])
+    
+    return faceEqualaterality
+
+# Convenience functions for face properties
+def vf2verts(v,f):
+    # returns face vertices for use in vf2... functions
+    return v[f,:]
+
+def vf2normals(v,f):
+    return computeFaceNormals(vf2verts(v,f))
+
+def vf2centroids(v,f):
+    return computeFaceCentroids(vf2verts(v,f))
+
+def vf2areas(v,f):
+    return computeFaceAreas(vf2verts(v,f))
+
+def vf2equalateralities(v,f):
+    return computeFaceEqualateralities(vf2verts(v,f))
+
+def Gf_edge_weights(v,f,fe):
     """
     
     Generate edge weights for plate graph.
