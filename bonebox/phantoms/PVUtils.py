@@ -28,10 +28,13 @@ def formatPV(arr):
     
     Convert array of edges of faces to pyvista format for use in pv.PolyData
     
-    arr: array in (N, dim)
-    
     dim = 2 for edges
     dim = 3 for faces
+
+    Parameters
+    ----------
+    arr
+        array in (N, dim)
 
     """
     

@@ -22,12 +22,16 @@ def delaunay2simplex(tri, n):
     Extract unique edges or faces from scipy.spatial.Delaunay objects.
     https://stackoverflow.com/questions/69512972/how-to-generate-edge-index-after-delaunay-triangulation
     
-    n: dimension of the simplex to be extracted
-    n=2 for edges
-    n=3 for faces
+    Parameters
+    ----------
+    n
+        dimension of the simplex to be extracted. 
+        n=2 for edges, 
+        n=3 for faces
     
-    returns np.array
-    
+    Returns
+    -------
+    np.array
     """
     
     from itertools import combinations
@@ -66,18 +70,26 @@ def removeEdgesWithFaces(edges, faces):
 
 def generatePoissonScaffold(volume_extent=np.array([5,5,5]),radius=0.5,k=30,seed=None,centered=False, init=None, return_init=False, remove_hull=True):
     """
-    
     Generate Poisson disc sampled points and delunary triangulate for fully-connected faces and edges
+
+    Parameters
+    ----------
+    volume_extent
+        spatial extent of the volume to model
+    radius
+        minimum radius between points
+    k
+        see ref. Number of points sampled
+    centered
+        set origin to middle of volume
+    init
+        initial seed points, poisson_disc_bonebox does not return the initial seed points, if used as input. 
+    return_init
+        returns initial seed points in the same order as the poisson disc sampled points.
     
-    volume_extent: spatial extent of the volume to model
-    radius: minimum radius between points
-    k: see ref. Number of points sampled
-    centered: set origin to middle of volume
-    
-    init: initial seed points, poisson_disc_bonebox does not return the initial seed points, if used as input. 
-    
-    return_init: returns initial seed points in the same order as the poisson disc sampled points.
-    Note: init_mask does not necessarily contain all points in init in this mode
+    Notes
+    -----
+    init_mask does not necessarily contain all points in init in this mode
     
     """
     import poisson_disc_bonebox
@@ -123,16 +135,8 @@ def getEdgeLengths(v,e):
 
     Parameters
     ----------
-    v : TYPE
-        DESCRIPTION.
-    e : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-
+    v
+    e
     """
     
     v = np.array(v)
@@ -146,16 +150,8 @@ def getEdgeDirections(v,e):
 
     Parameters
     ----------
-    v : TYPE
-        DESCRIPTION.
-    e : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    TYPE
-        DESCRIPTION.
-
+    v
+    e
     """
     
     v = np.array(v)
@@ -233,21 +229,17 @@ def ve2g(v,e,weights=None):
 
     Parameters
     ----------
-    v : TYPE
-        DESCRIPTION.
-    e : TYPE
-        DESCRIPTION.
-    weights : TYPE
+    v
+    e
+    weights : {None, "el", array-like}
         Weights assigned to edges.
-        None: all weights are 1
-        "el": reciprocol of edge lengths
-        array-like: manually assigned weights
+        None: all weights are 1. 
+        "el": reciprocol of edge lengths. 
+        array-like: manually assigned weights.
 
     Returns
     -------
-    G : TYPE
-        DESCRIPTION.
-
+    G
     """
     
     import networkx as nx
@@ -301,13 +293,11 @@ def polydata2trimesh(pdmesh):
 
     Parameters
     ----------
-    pdmesh : TYPE
-        DESCRIPTION.
+    pdmesh
 
     Returns
     -------
-    tmesh : TYPE
-        DESCRIPTION.
+    tmesh
 
     """
     # https://github.com/pyvista/pyvista/discussions/2268
@@ -321,13 +311,11 @@ def trimesh2polydata(tmesh):
 
     Parameters
     ----------
-    tmesh : TYPE
-        DESCRIPTION.
+    tmesh
 
     Returns
     -------
-    pdmesh : TYPE
-        DESCRIPTION.
+    pdmesh
 
     """    
     
@@ -346,22 +334,15 @@ def makeSlab(vertices,radii,slab,theta_resolution=10,phi_resolution=10):
 
     Parameters
     ----------
-    vertices : TYPE
-        DESCRIPTION.
-    radii : TYPE
-        DESCRIPTION.
-    slab : TYPE
-        DESCRIPTION.
-    theta_resolution : TYPE, optional
-        DESCRIPTION. The default is 10.
-    phi_resolution : TYPE, optional
-        DESCRIPTION. The default is 10.
+    vertices
+    radii
+    slab
+    theta_resolution : default=10
+    phi_resolution : default=10
 
     Returns
     -------
-    poly : TYPE
-        DESCRIPTION.
-
+    poly
     """
     
     import pyvista as pv
@@ -395,14 +376,12 @@ def pd2volume(pd,volume_extent,ndim,origin=(0,0,0),volume0=None):
         Spatial extent of the volume in x, y and z.
     ndim : (3,) integer tuple of nd.array
         Number of voxels in each dimension.
-    volume0 : TYPE
+    volume0
         Initial volume, if specified. Must be of size ndim.
 
     Returns
     -------
-    volume : TYPE
-        DESCRIPTION.
-
+    volume
     """
     
     volume_extent = np.array(volume_extent)
@@ -456,11 +435,19 @@ def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=5,phi
     """
     Converts graph (vertices, radii, edges, faces to voxel volume)
     
-    volume_extent: volume dimension in mm
-    ndim: number of voxels along each dimension
-    origin: (0,0,0) denotes corner
+    Parameters
+    ----------
+    volume_extent
+        volume dimension in mm
+    ndim
+        number of voxels along each dimension
+    origin
+        (0,0,0) denotes corner
     
-    returns voxel volume
+    Returns
+    -------
+    volume
+        voxel volume
     """
     
     e = removeEdgesWithFaces(e,f) # remove edges already in faces
@@ -484,10 +471,11 @@ def volume2surf(volume,voxelSize=(1,1,1),origin=None):
     
     Convenience function, converting volume to surface mesh using routines in MeshUtils
     
-    volume: array of 0 and 1
-    
-    sets boundary voxels of the volume to 0
-    
+    Parameters
+    ----------
+    volume
+        array of 0 and 1. 
+        sets boundary voxels of the volume to 0.
     """
     
     volume[0,:,:] = 0
@@ -520,7 +508,7 @@ def Gf_edges(f):
 
     Returns
     -------
-    f_e. 
+    f_e
 
     """
 
@@ -587,13 +575,14 @@ def angle_btw(v0, v1):
     v0 : array-like (3,) or (N,3)
         normal vectors corresponding to a face.
     V1 : array-like (3,) or (N,3), must be broadcastable with v0
-        DESCRIPTION.
 
     Returns
     -------
     None.
     
-    Note: this is the minimum angle between two LINES (<=90 degrees), not vectors
+    Notes
+    -----
+    This is the minimum angle between two LINES (<=90 degrees), not vectors
  
     """
     
@@ -615,13 +604,14 @@ def cosine_btw(v0, v1):
     v0 : array-like (3,) or (N,3)
         normal vectors corresponding to a face.
     V1 : array-like (3,) or (N,3), must be broadcastable with v0
-        DESCRIPTION.
 
     Returns
     -------
     None.
     
-    Note: this is the minimum angle between two LINES (<=90 degrees), not vectors
+    Notes
+    -----
+    This is the minimum angle between two LINES (<=90 degrees), not vectors
  
     """
     
@@ -739,7 +729,8 @@ def Gf_edge_weights(v,f,fe):
 
     Returns
     -------
-    Edge weights corresponding to fe.
+    weights
+        Edge weights corresponding to fe.
 
     """
     
