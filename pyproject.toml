@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "BoneBox"
+authors = [{name = "Qian Cao"}]
+version = "0.0.1"
+description = "Tools for bone modeling, evaluation and biomarker development."
+readme = "README.md"
+requires-python = ">=3.6"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "scikit-image",
+    "scikit-learn",
+    "glob2",
+    "pynrrd",
+    "pydicom",
+    "h5py",
+    "nibabel",
+    "meshio",
+    "trimesh",
+    "tetgen",
+    "vtk",
+    "pyvista",
+    "pyradiomics",
+    "edt",
+    "skan",
+    "sphinx",
+]
+
+[tool.setuptools.packages.find]
+exclude = ["data"]
