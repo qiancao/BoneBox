@@ -136,8 +136,6 @@ def Voxel2HexaMeshIndexCoord(volume):
 def HexaMeshIndexCoord2Voxel(nodes, elements, dim):
     """
     Convert hexamesh (bricks) in index coordinates to volume in voxels
-    
-    dim: dimension of volume in x, y and z in voxels (tuple)
         
     Example: to retrieve nodes corresponding to element 217:
     nodesSortedUnique[elements[217],:]
@@ -145,6 +143,11 @@ def HexaMeshIndexCoord2Voxel(nodes, elements, dim):
     Given the default voxelSize and origin, coordinates range from (-0.5 to dimXYZ+0.5)
     
     nodesSortedUnique.shape = (nodes,3)
+
+    Parameters
+    ----------
+    dim : tuple
+        dimension of volume in x, y and z in voxels
     
     """
     
@@ -158,9 +161,6 @@ def HexaMeshIndexCoord2Voxel(nodes, elements, dim):
 def HexaMeshIndexCoord2VoxelValue(nodes, elements, dim, elementValues):
     """
     Convert hexamesh (bricks) in index coordinates to volume in voxels with value of voxels assigned according to elementValues.
-    
-    dim: dimension of volume in x, y and z in voxels (tuple)
-    elementValues: len(elements) == len(elementValues)
         
     Example: to retrieve nodes corresponding to element 217:
     nodesSortedUnique[elements[217],:]
@@ -168,6 +168,13 @@ def HexaMeshIndexCoord2VoxelValue(nodes, elements, dim, elementValues):
     Given the default voxelSize and origin, coordinates range from (-0.5 to dimXYZ+0.5)
     
     nodesSortedUnique.shape = (nodes,3)
+
+    Parameters
+    ----------
+    dim : tuple
+        dimension of volume in x, y and z in voxels
+    elementValues
+        len(elements) == len(elementValues)
     
     """
     
@@ -182,9 +189,14 @@ def Index2AbsCoords(nodes, dim, voxelSize=(1,1,1), origin=(0,0,0)):
     """
     Convert array of node coordinates from index coordinates to absolute coordinates
         
-        dim: volume dimension in voxels (tuple)
-        origin: shift of origin from center of volume
+    Parameters
+    ----------
+    dim : tuple
+        volume dimension in voxels
+    origin
+        shift of origin from center of volume. 
         (0,0,0) corresponds to center of volume (default), (-X/2, -Y/2, -Z/2) refers to "top left corner".
+    
     """
 
     dim = np.array(dim)
@@ -197,9 +209,14 @@ def Abs2IndexCoords(nodes, dim, voxelSize=(1,1,1), origin=(0,0,0)):
     """
     Convert array of node coordinates from abs coordinates to index coordinates
         
-        dim: volume dimension in voxels (tuple)
-        origin: shift of origin from center of volume
+    Parameters
+    ----------
+    dim : tuple
+        volume dimension in voxels
+    origin
+        shift of origin from center of volume. 
         (0,0,0) corresponds to center of volume (default), (-X/2, -Y/2, -Z/2) refers to "top left corner".
+    
     """
 
     dim = np.array(dim)

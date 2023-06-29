@@ -7,6 +7,10 @@ Create a simple trabecular bone phantom
 
 import numpy as np
 import os
+import sys
+
+# TODO: probably a better way to import modules from parent directory
+sys.path.append("../")
 
 import TrabeculaePhantom
 import MedialAxisUtils

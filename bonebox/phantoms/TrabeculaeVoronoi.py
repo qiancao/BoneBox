@@ -43,13 +43,15 @@ def Polar2CartesianEllipsoid(Phi, Lambda, r, h, N):
     Lambda : np.ndarray
         Angle from XY plane.
     h : np.ndarray
-        DESCRIPTION.
-    N : TYPE
-        DESCRIPTION.
+    N
 
     Returns
     -------
     Pxyz : points in XYZ
+
+    Notes
+    -----
+    This is NOT a uniform sampling of the ellipsoid.
 
     """
     raise(NotImplemented,"Currently supports sampleSphere")
@@ -59,8 +61,6 @@ def Polar2CartesianSphere(r, Theta, Phi):
     Sample from sphere solid.
     
     https://en.wikipedia.org/wiki/Spherical_coordinate_system
-    
-    Note that this is NOT a uniform sampling of the ellipsoid.
 
     Parameters
     ----------
@@ -74,6 +74,10 @@ def Polar2CartesianSphere(r, Theta, Phi):
     Returns
     -------
     np.ndarray[N,3]
+
+    Notes
+    -----
+    This is NOT a uniform sampling of the ellipsoid.
 
     """
     
@@ -96,13 +100,11 @@ def setEdgesZero(volume):
 
     Parameters
     ----------
-    volume : TYPE
-        DESCRIPTION.
+    volume
 
     Returns
     -------
-    volume : TYPE
-        DESCRIPTION.
+    volume
 
     """
     
@@ -375,8 +377,6 @@ def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
     """
     Compute direction cosine with of edges with points in vertices, along a
     specified direction.
-    
-    Note: use np.abs(cosines) to convert (-) to (+) direction.
 
     Parameters
     ----------
@@ -389,6 +389,10 @@ def computeEdgeCosine(edgeVertices, direction = (0,0,1)):
     -------
     cosines : np.ndarray (Nedges)
         cosine with respect to direction.
+
+    Notes
+    -----
+    Use np.abs(cosines) to convert (-) to (+) direction.
 
     """
     direction = np.array(direction)
@@ -405,17 +409,13 @@ def filterEdgesRandomUniform(uniqueEdges, retainFraction = 0.8, randState=None):
     
     Parameters
     ----------
-    uniqueEdges : TYPE
-        DESCRIPTION.
-    retainFraction : TYPE, optional
-        DESCRIPTION. The default is 0.8.
-    randState : TYPE, optional
-        DESCRIPTION. The default is None.
+    uniqueEdges
+    retainFraction : default=0.8
+    randState : default=None
 
     Returns
     -------
-    uniqueEdgesRetain : TYPE
-        DESCRIPTION.
+    uniqueEdgesRetain
 
     """
     # TODO does other edge-drop schemes belong here? Maybe use another function for that
@@ -783,9 +783,14 @@ def sampleRosconi(cdfThickness, cdf, size=None, randState=None):
     Sample from a Rosconi distribution.
     Random state of uniform variable generator defined by randState
     
-    t - thickness values corresponding to cdf.
-    cdf - 1D array of the corresponding Rosconi cdf.
-    size - shape of the output array (independent cdf).
+    Parameters
+    ----------
+    t
+        thickness values corresponding to cdf.
+    cdf : 1D array
+        1D array of the corresponding Rosconi cdf.
+    size
+        shape of the output array (independent cdf).
     
     """
     
