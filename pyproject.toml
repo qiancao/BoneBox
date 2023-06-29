@@ -32,6 +32,7 @@ dependencies = [
     "pyradiomics",
     "edt",
     "skan",
+    "networkx",
     "sphinx",
 ]
 
