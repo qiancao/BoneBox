@@ -9,19 +9,13 @@ import numpy as np
 import os
 import sys
 
-# TODO: probably a better way to import modules from parent directory
-sys.path.append("../")
-
-import TrabeculaePhantom
-import MedialAxisUtils
-import PVUtils
-import MeshUtils
-
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pyvista as pv
 
 import networkx as nx
+
+from bonebox.phantoms import TrabeculaePhantom, MedialAxisUtils, PVUtils, MeshUtils
 
 def generate(volume_extent = [3,]*3,
             volume_ndim = (120,)*3,
