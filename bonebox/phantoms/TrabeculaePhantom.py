@@ -92,7 +92,7 @@ def generatePoissonScaffold(volume_extent=np.array([5,5,5]),radius=0.5,k=30,seed
     init_mask does not necessarily contain all points in init in this mode
     
     """
-    import poisson_disc_bonebox
+    from . import poisson_disc_bonebox
     
     if return_init==False: # refactor this later
         vertices_pd = poisson_disc_bonebox.Bridson_sampling(volume_extent, radius=radius, k=k, seed=seed, init=init)
