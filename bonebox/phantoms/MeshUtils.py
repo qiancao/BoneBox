@@ -248,6 +248,12 @@ def smoothSurfMesh(vertices, faces, **trimeshkwargs):
     
     return mesh.vertices, mesh.faces
 
+def smooth_surface_mesh(mesh,iterations):
+    #smooths surface mesh based on Laplacian smoothing function from pyvista 
+    mesh = pv.wrap(mesh)
+    mesh_smoothed = surface_mesh.smooth(iterations,feature_smoothing = False)
+    return mesh_smoothed
+
 # TODO: FQMR doesn't seem to generate watertight meshes
 def simplifySurfMeshFQMR(vertices, faces, target_fraction=0.25, lossless=True,
                       preserve_border=True, **kwargs):
