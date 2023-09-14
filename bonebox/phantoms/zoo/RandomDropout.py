@@ -19,6 +19,7 @@ from bonebox.phantoms import TrabeculaePhantom, MedialAxisUtils, PVUtils, MeshUt
 
 def generate(volume_extent = [3,]*3,
             volume_ndim = (120,)*3,
+            cores = 1,
             scaffold_k = 30,
             scaffold_radius = 0.4,
             faces_init_fraction = 0.1,
@@ -38,6 +39,8 @@ def generate(volume_extent = [3,]*3,
         DESCRIPTION. The default is [3,]*3.
     volume_ndim : TYPE, optional
         DESCRIPTION. The default is (120,)*3.
+    cores : TYPE, optional
+        DESCRIPTION. The default is 1.
     scaffold_k : TYPE, optional
         DESCRIPTION. The default is 30.
     scaffold_radius : TYPE, optional
@@ -96,7 +99,7 @@ def generate(volume_extent = [3,]*3,
     e_hat = e0[edges_mask]
     f_hat = f0[faces_mask]
     
-    volume = TrabeculaePhantom.vref2volume(v0,TbTh,e_hat,f_hat,volume_extent,
+    volume = TrabeculaePhantom.vref2volume(v0,TbTh,e_hat,f_hat,volume_extent,cores,
                                            ndim=volume_ndim,
                                            origin=(0,0,0),
                                            theta_resolution=5,
