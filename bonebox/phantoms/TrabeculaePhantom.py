@@ -9,6 +9,9 @@ TrabeculaeVoronoi
 
 """
 
+from concurrent.futures import ProcessPoolExecutor
+from itertools import repeat
+
 import numpy as np
 import scipy
 import networkx as nx
@@ -431,9 +434,9 @@ def pd2volume(pd,volume_extent,ndim,origin=(0,0,0),volume0=None):
     
     return volume
 
-def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=5,phi_resolution=5):
+def vref2volumeProcess(v,r,e,f,volume_extent,ndim,origin,volume,theta_resolution,phi_resolution):   
     """
-    Converts graph (vertices, radii, edges, faces to voxel volume)
+    Carries out the voxelization for a single process for vref2volume
     
     Parameters
     ----------
@@ -447,12 +450,8 @@ def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=5,phi
     Returns
     -------
     volume
-        voxel volume
+        partial voxel volume from a single process
     """
-    
-    e = removeEdgesWithFaces(e,f) # remove edges already in faces
-    
-    volume = np.zeros(ndim,dtype=bool)
     
     for ee, edge in enumerate(e): # use cleaned edges
         print(f"edges: {ee}/{len(e)}")
@@ -464,6 +463,98 @@ def vref2volume(v,r,e,f,volume_extent,ndim,origin=(0,0,0),theta_resolution=5,phi
         pd = makeSlab(v,r,f[ff],theta_resolution=theta_resolution,phi_resolution=phi_resolution)
         volume = pd2volume(pd,volume_extent,ndim,origin=origin,volume0=volume)
     
+    return volume
+ 
+def splitStructures(structures, cores):
+    """
+    Splits list of edges and faces into evenly sized sublists, with the number of sublists equal to the number of cores
+   
+    Parameters
+    ----------
+    structures
+        the list of edges or faces in the volume
+    cores
+        number of cores for multiprocessing
+   
+    Returns
+    -------
+    sublists
+        list of evenly sized sublists, of length cores
+    """
+   
+    sublist_length = len(structures) // cores
+    sublists = []
+   
+    for i in range(cores):
+        start = i * sublist_length
+        end = start + sublist_length
+        sublist = structures[start:end]
+        sublists.append(sublist)
+   
+    remainder = len(structures) % cores
+    for i in range(remainder):
+        combined_remainder = np.vstack((sublists[-(i+1)], structures[-(i+1)].reshape(1, -1)))
+        sublists[-(i+1)] = combined_remainder
+       
+    return sublists
+ 
+def vref2volume(v,r,e,f,volume_extent,cores,ndim,origin=(0,0,0),theta_resolution=5,phi_resolution=5):
+    """
+    Converts graph (vertices, radii, edges, faces to voxel volume)
+   
+    Parameters
+    ----------
+    volume_extent
+        volume dimension in mm
+    cores
+        number of cores for multiprocessing
+    ndim
+        number of voxels along each dimension
+    origin
+        (0,0,0) denotes corner
+   
+    Returns
+    -------
+    volume
+        voxel volume
+    """
+   
+    e = removeEdgesWithFaces(e,f) # remove edges already in faces
+   
+    print(f"Number of edges {len(e)}")
+    print(f"Number of faces {len(f)}")
+   
+    # run single core without multiprocessing
+    if cores == 1:
+        volume0 = np.zeros(ndim,dtype=bool)
+        volume = vref2volumeProcess(v,r,e,f,volume_extent,ndim,origin,volume0,theta_resolution,phi_resolution)
+        return volume
+   
+    # create iterables for executor.map()
+    e_list = splitStructures(e, cores)
+    f_list = splitStructures(f, cores)
+   
+    volume0_list = [np.zeros(ndim,dtype=bool) for _ in range(cores)]
+   
+    v_list = repeat(v, cores)
+    r_list = repeat(r, cores)
+    volume_extent_list = repeat(volume_extent, cores)
+    ndim_list = repeat(ndim, cores)
+    origin_list = repeat(origin, cores)
+    theta_list = repeat(theta_resolution, cores)
+    phi_list = repeat(phi_resolution, cores)
+ 
+    with ProcessPoolExecutor() as executor:
+        results = executor.map(vref2volumeProcess, v_list, r_list, e_list, f_list, volume_extent_list,
+                               ndim_list, origin_list, volume0_list, theta_list, phi_list)
+   
+    results_list = list(results)
+   
+    # combine result volumes together
+    volume = results_list[0]
+    for i in range(1, cores):
+        volume = np.logical_or(volume, results_list[i])
+ 
     return volume
 
 def volume2surf(volume,voxelSize=(1,1,1),origin=None):
