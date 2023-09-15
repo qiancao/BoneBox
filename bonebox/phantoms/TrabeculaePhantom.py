@@ -409,7 +409,7 @@ def pd2volume(pd,volume_extent,ndim,origin=(0,0,0),volume0=None):
         bmin = bounds[2*d]
         bmax = bounds[2*d+1]
         
-        axis_ind = np.arange(ndim[d]) + 0.5 # index coordinates
+        axis_ind = np.arange(ndim[d]) + 0.5 # index coordinates, TODO: this line potentially changes type to double
         axis_abs = axis_ind * spacing[d] - origin[d] # absolute coordinates
         axis_bb = (axis_abs > bmin) & (axis_abs < bmax) # coordinates within the bounding box
         
