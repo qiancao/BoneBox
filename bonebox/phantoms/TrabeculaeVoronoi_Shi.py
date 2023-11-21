@@ -378,9 +378,9 @@ def findUniqueEdgesAndFaces(vor, ind, Sxyz, maxEdgePerFace=8):
     ind_exclude_1 = [x for x in range(vor.vertices.shape[0])
                     if ((abs(vor.vertices[x][0]) > abs(Sxyz[0]/2*0.9)) | (abs(vor.vertices[x][1]) > abs(Sxyz[1]/2*0.9)) | (abs(vor.vertices[x][2]) > abs(Sxyz[2]/2*0.9)))]
     
-    print(len(ind_exclude))
+#     print(len(ind_exclude))
     ind_exclude = set(list(ind_exclude) + ind_exclude_1)
-    print(len(ind_exclude))
+#     print(len(ind_exclude))
     
     ind_exclude.add(-1) # -1 means Vornoi vertex outside the Voronoi Diagram
     
